@@ -183,11 +183,15 @@ board_discover() {
 
   echo ""
   echo "=== Transitions (from first issue) ==="
-  local first_key
-  first_key=$(curl -s -X POST -u "$JIRA_AUTH" -H "Content-Type: application/json" \
+  local first_id
+  first_id=$(curl -s -X POST -u "$JIRA_AUTH" -H "Content-Type: application/json" \
     -d "{\"jql\":\"project=$BOARD_PROJECT_KEY ORDER BY rank ASC\",\"maxResults\":1}" \
     "$JIRA_BASE/search/jql" | \
-    node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.issues&&j.issues[0])console.log(j.issues[0].key);})")
+    node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.issues&&j.issues[0])console.log(j.issues[0].id);})")
+  local first_key=""
+  if [[ -n "$first_id" ]]; then
+    first_key=$(board_get_card_key "$first_id")
+  fi
 
   if [[ -n "$first_key" ]]; then
     curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$first_key/transitions" | \

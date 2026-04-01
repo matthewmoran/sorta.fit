@@ -431,7 +431,10 @@ async function handleDiscoverBoard(req, res) {
             maxResults: 1,
           });
           if (searchResult.statusCode === 200 && searchResult.data.issues && searchResult.data.issues.length > 0) {
-            const issueKey = searchResult.data.issues[0].key;
+            const issueId = searchResult.data.issues[0].id;
+            // Fetch issue to get key (search/jql only returns id)
+            const issueResult = await jiraGet(`/rest/api/3/issue/${issueId}`);
+            const issueKey = issueResult.statusCode === 200 ? issueResult.data.key : issueId;
             const transResult = await jiraGet(`/rest/api/3/issue/${issueKey}/transitions`);
             if (transResult.statusCode === 200 && transResult.data.transitions) {
               for (const t of transResult.data.transitions) {
