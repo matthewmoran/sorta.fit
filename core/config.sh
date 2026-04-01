@@ -20,6 +20,12 @@ fi
 
 # Required vars
 : "${BOARD_ADAPTER:?BOARD_ADAPTER not set (jira, linear, github-issues)}"
+
+# Validate adapter name (prevent path traversal in sourced files)
+case "$BOARD_ADAPTER" in
+  jira|linear|github-issues) ;;
+  *) echo "ERROR: Unknown adapter: $BOARD_ADAPTER"; exit 1 ;;
+esac
 : "${BOARD_DOMAIN:?BOARD_DOMAIN not set}"
 : "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"

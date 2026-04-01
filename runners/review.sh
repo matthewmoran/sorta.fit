@@ -33,7 +33,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   fi
 
   # Check if already reviewed by Sorta.Fit
-  if echo "$COMMENTS" | grep -q "AI Code Review"; then
+  if echo "$COMMENTS" | grep -q "Code Review —"; then
     log_info "$ISSUE_KEY already reviewed. Skipping."
     continue
   fi

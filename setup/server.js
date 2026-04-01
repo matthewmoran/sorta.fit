@@ -38,11 +38,7 @@ const MIME_TYPES = {
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
+  return {};
 }
 
 function sendJSON(res, statusCode, data) {
@@ -473,6 +469,11 @@ async function handleSaveConfig(req, res) {
     return sendJSON(res, 400, { success: false, message: 'Missing required fields: env, adapter' });
   }
 
+  // Validate adapter name to prevent path traversal
+  if (!/^[a-z][a-z0-9-]*$/.test(adapter)) {
+    return sendJSON(res, 400, { success: false, message: 'Invalid adapter name' });
+  }
+
   try {
     // 1. Write .env file to project root with human-readable comments
     const e = env;
@@ -814,7 +815,7 @@ server.on('error', (err) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   const url = `http://localhost:${PORT}`;
   console.log(`Sorta.Fit setup wizard running at ${url}`);
   console.log('Press Ctrl+C to stop.\n');

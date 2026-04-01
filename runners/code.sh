@@ -55,7 +55,10 @@ for ISSUE_ID in $ISSUE_IDS; do
   # Clean up leftover worktree
   if [[ -d "$CARD_WORKTREE" ]]; then
     log_warn "Cleaning up leftover worktree..."
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || rm -rf "$CARD_WORKTREE"
+    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || rm -rf "$CARD_WORKTREE" 2>/dev/null || {
+      log_warn "Locked worktree for $ISSUE_KEY. Using alternate directory."
+      CARD_WORKTREE="${CARD_WORKTREE}-$(date +%s)"
+    }
   fi
 
   # Create or reuse branch
@@ -122,6 +125,14 @@ for ISSUE_ID in $ISSUE_IDS; do
   fi
 
   log_info "$COMMIT_COUNT commit(s) on branch."
+
+  # Push branch to remote
+  (cd "$CARD_WORKTREE" && git push -u origin "$BRANCH_NAME" 2>/dev/null) || {
+    log_error "Failed to push branch $BRANCH_NAME for $ISSUE_KEY"
+    board_add_comment "$ISSUE_KEY" "Sorta.Fit: push failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
+    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    continue
+  }
 
   # Create PR
   PR_BODY_FILE=$(mktemp)
