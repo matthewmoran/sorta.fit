@@ -97,6 +97,59 @@ lock_release() {
   rm -f "$lock_file"
 }
 
+# Rate limit detection
+RATE_LIMIT_FILE="${SORTA_ROOT:-.}/.rate-limited"
+
+# Run claude and detect rate limits
+# Usage: run_claude <prompt_file> <result_file> [working_dir]
+# Returns 0 on success, 1 on failure, 2 on rate limit
+run_claude() {
+  local prompt_file="$1"
+  local result_file="$2"
+  local work_dir="${3:-$SORTA_ROOT}"
+  local stderr_file
+  stderr_file=$(mktemp)
+
+  (cd "$work_dir" && claude -p "$(cat "$prompt_file")" > "$result_file" 2>"$stderr_file") || {
+    local stderr_content
+    stderr_content=$(cat "$stderr_file" 2>/dev/null)
+    rm -f "$stderr_file"
+
+    # Check for rate limit indicators
+    if echo "$stderr_content" | grep -qiE "rate.limit|too.many.requests|usage.limit|capacity|throttl"; then
+      log_warn "Claude rate limit detected. Pausing further runs."
+      date +%s > "$RATE_LIMIT_FILE"
+      return 2
+    fi
+
+    return 1
+  }
+
+  rm -f "$stderr_file"
+  return 0
+}
+
+# Check if we're currently rate limited
+is_rate_limited() {
+  if [[ ! -f "$RATE_LIMIT_FILE" ]]; then
+    return 1
+  fi
+  # Wait at least 30 minutes before retrying after a rate limit
+  local limit_time
+  limit_time=$(cat "$RATE_LIMIT_FILE" 2>/dev/null || echo 0)
+  local now
+  now=$(date +%s)
+  local wait_seconds=1800
+  if (( now - limit_time < wait_seconds )); then
+    local remaining=$(( wait_seconds - (now - limit_time) ))
+    log_warn "Rate limited. ${remaining}s remaining before retry."
+    return 0
+  fi
+  # Limit window passed, clear the flag
+  rm -f "$RATE_LIMIT_FILE"
+  return 1
+}
+
 # Render a prompt template — replaces {{KEY}} with values
 # Usage: render_template "file.md" KEY1 "value1" KEY2 "value2"
 render_template() {

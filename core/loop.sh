@@ -44,6 +44,10 @@ echo ""
 preflight_check || exit 1
 
 run_cycle() {
+  if is_rate_limited; then
+    return
+  fi
+
   if ! lock_acquire "$LOCK_FILE"; then
     return
   fi
