@@ -1,5 +1,6 @@
 node_modules/
 .env
+adapters/*.config.sh
 .automation.lock
 .worktrees/
 .claude/
