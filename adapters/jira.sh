@@ -46,6 +46,12 @@ board_get_card_title() {
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.fields.summary);})"
 }
 
+board_get_card_type() {
+  local issue_key="$1"
+  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \
+    node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.fields.issuetype.name);})"
+}
+
 board_get_card_description() {
   local issue_key="$1"
   curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \

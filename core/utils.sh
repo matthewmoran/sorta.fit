@@ -97,6 +97,25 @@ lock_release() {
   rm -f "$lock_file"
 }
 
+# Check if a card matches a runner's type filter
+# Usage: matches_type_filter "Bug" "Bug,Defect"
+# Returns 0 if filter is empty (no filter = match all) or card type is in the filter
+matches_type_filter() {
+  local card_type="$1"
+  local filter="$2"
+  if [[ -z "$filter" ]]; then
+    return 0
+  fi
+  IFS=',' read -ra types <<< "$filter"
+  for t in "${types[@]}"; do
+    t=$(echo "$t" | xargs) # trim whitespace
+    if [[ "$card_type" == "$t" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Rate limit detection
 RATE_LIMIT_FILE="${SORTA_ROOT:-.}/.rate-limited"
 

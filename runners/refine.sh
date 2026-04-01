@@ -20,6 +20,16 @@ fi
 
 for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
+
+  # Check type filter
+  if [[ -n "$RUNNER_REFINE_FILTER_TYPE" ]]; then
+    CARD_TYPE=$(board_get_card_type "$ISSUE_KEY")
+    if ! matches_type_filter "$CARD_TYPE" "$RUNNER_REFINE_FILTER_TYPE"; then
+      log_info "Skipping $ISSUE_KEY (type: $CARD_TYPE, filter: $RUNNER_REFINE_FILTER_TYPE)"
+      continue
+    fi
+  fi
+
   TITLE=$(board_get_card_title "$ISSUE_KEY")
   DESCRIPTION=$(board_get_card_description "$ISSUE_KEY")
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
