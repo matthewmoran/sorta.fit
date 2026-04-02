@@ -11,18 +11,24 @@ source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
 
 log_info "Reviewer: checking $RUNNER_REVIEW_FROM lane..."
 
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REVIEW_FROM" "$MAX_CARDS_REVIEW")
-
-if [[ -z "$ISSUE_IDS" ]]; then
-  log_info "No cards in $RUNNER_REVIEW_FROM. Nothing to review."
-  exit 0
-fi
-
 GH_CMD=$(find_gh)
 
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REVIEW_FROM" "$MAX_CARDS_REVIEW" "$START_AT")
+
+if [[ -z "$ISSUE_IDS" ]]; then
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_REVIEW_FROM. Nothing to review."
+  break
+fi
+
+BATCH_PROCESSED=0
+
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   # Find PR URL in comments
   PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
@@ -71,11 +77,14 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   log_info "Running Claude for review..."
-  (claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>/dev/null) || {
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for review of $ISSUE_KEY"
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   REVIEW=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"
@@ -103,7 +112,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$REVIEW" > "$REVIEW_BODY_FILE"
 
   "$GH_CMD" pr review "$PR_URL" --"$REVIEW_EVENT" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || {
-    log_warn "PR review failed. Falling back to comment."
+    log_info "Posting as comment (can't review your own PR)."
     "$GH_CMD" pr comment "$PR_URL" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || \
       log_error "Could not post review to $PR_URL"
   }
@@ -123,9 +132,24 @@ $REVIEW"
 
   if [[ -n "$RUNNER_REVIEW_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_REVIEW_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Review complete for $ISSUE_KEY. Moved to $RUNNER_REVIEW_TO."
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Review complete for $ISSUE_KEY. Moved to $RUNNER_REVIEW_TO."
+    else
+      log_warn "No transition mapping found for status $RUNNER_REVIEW_TO — review complete but card not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Review complete for $ISSUE_KEY. Card stays in $RUNNER_REVIEW_FROM."
   fi
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_REVIEW))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done

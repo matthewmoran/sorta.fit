@@ -1,12 +1,12 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Sorta.Fit is an AI-powered sprint automation system that connects issue boards (Jira, Linear, GitHub Issues) to Claude Code CLI. It runs a polling loop that reads cards from a board, renders prompt templates, and passes them to Claude Code for hands-off card refinement, implementation, PR review, and bug triage.
+Sorta.Fit is an AI-powered sprint automation system that connects issue boards (Jira, Linear, GitHub Issues) to Codex CLI. It runs a polling loop that reads cards from a board, renders prompt templates, and passes them to Codex for hands-off card refinement, implementation, PR review, and bug triage.
 
-**Stack:** Bash orchestration, Node.js (JSON/ADF parsing, template rendering), Git, GitHub CLI, Claude Code CLI.
+**Stack:** Bash orchestration, Node.js (JSON/ADF parsing, template rendering), Git, GitHub CLI, Codex CLI.
 
 ## Running the System
 
@@ -24,7 +24,6 @@ bash runners/code.sh
 bash runners/review.sh
 bash runners/triage.sh
 bash runners/bounce.sh
-bash runners/merge.sh
 
 # Generate release notes (manual, not part of the loop)
 bash runners/release-notes.sh <since-tag-or-date> [output-file]
@@ -56,16 +55,14 @@ Currently implemented: Jira Cloud (`adapters/jira.sh`). Linear and GitHub Issues
 
 ### Runners
 
-Each runner in `runners/` follows the same pattern: query cards from a source lane → fetch details → render a prompt from `prompts/*.md` → pass to Claude Code CLI (`claude -p`) → update the board → transition the card.
+Each runner in `runners/` follows the same pattern: query cards from a source lane → fetch details → render a prompt from `prompts/*.md` → pass to Codex CLI (`Codex -p`) → update the board → transition the card.
 
 - **refine** — Generates structured specs from raw cards (To Do → Refined)
 - **architect** — Analyzes codebase architecture and produces implementation plans (Refined → Architected)
-- **code** — Creates branch, worktree, runs Claude for implementation, opens PR (Agent → QA)
-- **review** — Fetches PR diff, runs Claude review, posts verdict to GitHub (QA lane)
+- **code** — Creates branch, worktree, runs Codex for implementation, opens PR (Agent → QA)
+- **review** — Fetches PR diff, runs Codex review, posts verdict to GitHub (QA lane)
 - **triage** — Analyzes bug reports, appends root-cause analysis (To Do → Refined)
 - **bounce** — Detects rejected PRs, routes back for rework or escalates after `MAX_BOUNCES` (QA → Agent)
-- **documenter** — Generates/updates project docs from card specs in isolated worktrees, opens PR (configurable lanes)
-- **merge** — Merges approved PRs, transitions card to done (QA → Done)
 
 ### Prompt Templates
 
@@ -77,24 +74,24 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 - Logging via `log_info`, `log_warn`, `log_error`, `log_step` from `core/utils.sh` — no bare `echo`
 - UPPERCASE for env/exported variables, lowercase for locals
 - 2-space indentation, LF line endings only
-- Allowed dependencies: Bash, Git, Node.js, curl, gh (GitHub CLI), claude — no Python, jq, or other external tools
+- Allowed dependencies: Bash, Git, Node.js, curl, gh (GitHub CLI), Codex — no Python, jq, or other external tools
 - No hardcoded values; use env vars and config
 
 ## Safety Invariants
 
 - The `code` runner uses **isolated git worktrees** (`.worktrees/`); the main working tree is never modified
 - Branches named `main`, `master`, `dev`, `develop` are **never checked out** by runners
-- AI-created branches are always prefixed `claude/{ISSUE_KEY}-{slug}`
+- AI-created branches are always prefixed `Codex/{ISSUE_KEY}-{slug}`
 - No `git push --force` or destructive git operations
 - `.automation.lock` prevents overlapping polling cycles
 
 ## Extension Points
 
-- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`. See [`docs/writing-runners.md`](docs/writing-runners.md) for a complete step-by-step guide.
+- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`
 - **New adapter:** Create `adapters/{name}.sh` implementing all `board_*` functions + `adapters/{name}.config.sh.example`
 
 ## Configuration
 
-All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `GIT_RELEASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing. The documenter runner also uses `DOCS_DIR` (target directory for generated docs, default `docs`) and `DOCS_ORGANIZE_BY` (organization strategy, default `feature`).
+All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing.
 
 Runner lane routing uses **Jira status IDs** (not names). `RUNNER_*_FROM` is the status ID to query cards from; `RUNNER_*_TO` is the status ID to transition cards to (resolved via `TRANSITION_TO_<id>` in the adapter config). Run the setup wizard to discover your board's IDs.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runner: Refine cards — generates structured specs
+# Runner: Architect — analyzes codebase and enriches refined specs with implementation plans
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,16 +9,16 @@ source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
 
-log_info "Refiner: checking $RUNNER_REFINE_FROM lane..."
+log_info "Architect: checking $RUNNER_ARCHITECT_FROM lane..."
 
 START_AT=0
 SKIP_RETRIES=0
 
 while true; do
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REFINE_FROM" "$MAX_CARDS_REFINE" "$START_AT")
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_ARCHITECT_FROM" "$MAX_CARDS_ARCHITECT" "$START_AT")
 
 if [[ -z "$ISSUE_IDS" ]]; then
-  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_REFINE_FROM. Nothing to refine."
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_ARCHITECT_FROM. Nothing to architect."
   break
 fi
 
@@ -27,22 +27,13 @@ BATCH_PROCESSED=0
 for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
 
-  # Check type filter
-  if [[ -n "$RUNNER_REFINE_FILTER_TYPE" ]]; then
-    CARD_TYPE=$(board_get_card_type "$ISSUE_KEY") || { log_warn "Failed to fetch type for $ISSUE_KEY. Skipping."; continue; }
-    if ! matches_type_filter "$CARD_TYPE" "$RUNNER_REFINE_FILTER_TYPE"; then
-      log_info "Skipping $ISSUE_KEY (type: $CARD_TYPE, filter: $RUNNER_REFINE_FILTER_TYPE)"
-      continue
-    fi
-  fi
-
   TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
   DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  log_step "Refining: $ISSUE_KEY — $TITLE"
+  log_step "Architecting: $ISSUE_KEY — $TITLE"
 
-  PROMPT=$(render_template "$SORTA_ROOT/prompts/refine.md" \
+  PROMPT=$(render_template "$SORTA_ROOT/prompts/architect.md" \
     CARD_KEY "$ISSUE_KEY" \
     CARD_TITLE "$TITLE" \
     CARD_DESCRIPTION "$DESCRIPTION" \
@@ -61,28 +52,34 @@ for ISSUE_ID in $ISSUE_IDS; do
     continue
   fi
 
-  if [[ ! -s "$RESULT_FILE" ]]; then
-    log_error "Empty response for $ISSUE_KEY, skipping"
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
+  ARCH_PLAN=$(cat "$RESULT_FILE")
+  rm -f "$PROMPT_FILE" "$RESULT_FILE"
+
+  if [[ -z "$ARCH_PLAN" ]]; then
+    log_warn "Empty architecture plan for $ISSUE_KEY. Skipping."
     continue
   fi
 
-  board_update_description "$ISSUE_KEY" "$(cat "$RESULT_FILE")"
-  board_add_comment "$ISSUE_KEY" "Card refined by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). Review and move to Agent lane when ready."
+  UPDATED_DESC="$DESCRIPTION
 
-  if [[ -n "$RUNNER_REFINE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_REFINE_TO}"
+---
+## Architecture Plan (Sorta)
+$ARCH_PLAN"
+
+  board_update_description "$ISSUE_KEY" "$UPDATED_DESC"
+  board_add_comment "$ISSUE_KEY" "Card architected by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). Ready for implementation."
+
+  if [[ -n "$RUNNER_ARCHITECT_TO" ]]; then
+    local_transition="TRANSITION_TO_${RUNNER_ARCHITECT_TO}"
     if [[ -n "${!local_transition:-}" ]]; then
       board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY refined and moved to $RUNNER_REFINE_TO"
+      log_info "Done: $ISSUE_KEY architected and moved to $RUNNER_ARCHITECT_TO"
     else
-      log_warn "No transition mapping found for status $RUNNER_REFINE_TO — card refined but not moved. Add $local_transition to your adapter config."
+      log_warn "No transition mapping found for status $RUNNER_ARCHITECT_TO — card architected but not moved. Add $local_transition to your adapter config."
     fi
   else
-    log_info "Done: $ISSUE_KEY refined (no transition configured)"
+    log_info "Done: $ISSUE_KEY architected (no transition configured)"
   fi
-
-  rm -f "$PROMPT_FILE" "$RESULT_FILE"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 
@@ -92,6 +89,6 @@ if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
   log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
   break
 fi
-START_AT=$((START_AT + MAX_CARDS_REFINE))
+START_AT=$((START_AT + MAX_CARDS_ARCHITECT))
 log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done

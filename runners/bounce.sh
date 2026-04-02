@@ -15,17 +15,23 @@ BOUNCE_ESCALATE_TO="${RUNNER_BOUNCE_ESCALATE:-}"
 
 log_info "Bounce: checking $RUNNER_BOUNCE_FROM lane for rejected PRs..."
 
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_BOUNCE_FROM" "$MAX_CARDS_BOUNCE")
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_BOUNCE_FROM" "$MAX_CARDS_BOUNCE" "$START_AT")
 
 if [[ -z "$ISSUE_IDS" ]]; then
-  log_info "No cards in $RUNNER_BOUNCE_FROM. Nothing to bounce."
-  exit 0
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_BOUNCE_FROM. Nothing to bounce."
+  break
 fi
 
+BATCH_PROCESSED=0
+
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
-  TITLE=$(board_get_card_title "$ISSUE_KEY")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   # Find PR URL in comments
   PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
@@ -51,8 +57,12 @@ for ISSUE_ID in $ISSUE_IDS; do
 
     if [[ -n "$BOUNCE_ESCALATE_TO" ]]; then
       local_transition="TRANSITION_TO_${BOUNCE_ESCALATE_TO}"
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "$ISSUE_KEY escalated to $BOUNCE_ESCALATE_TO"
+      if [[ -n "${!local_transition:-}" ]]; then
+        board_transition "$ISSUE_KEY" "${!local_transition}"
+        log_info "$ISSUE_KEY escalated to $BOUNCE_ESCALATE_TO"
+      else
+        log_warn "No transition mapping found for status $BOUNCE_ESCALATE_TO — card not escalated. Add $local_transition to your adapter config."
+      fi
     fi
     continue
   fi
@@ -95,9 +105,24 @@ $REVIEW_COMMENTS"
 
   if [[ -n "$RUNNER_BOUNCE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_BOUNCE_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY bounced to $RUNNER_BOUNCE_TO for rework"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY bounced to $RUNNER_BOUNCE_TO for rework"
+    else
+      log_warn "No transition mapping found for status $RUNNER_BOUNCE_TO — card bounced but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY bounced (no transition configured)"
   fi
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_BOUNCE))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runner: Code — implements cards in isolated worktrees
+# Runner: Documenter — generates and maintains project docs from card specs
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,7 @@ source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
 PROTECTED_BRANCHES="main master dev develop"
 WORKTREE_DIR="$SORTA_ROOT/.worktrees"
 
-log_info "Coder: checking $RUNNER_CODE_FROM lane..."
+log_info "Documenter: checking $RUNNER_DOCUMENTER_FROM lane..."
 
 REPO_ROOT="$TARGET_REPO"
 
@@ -28,10 +28,10 @@ START_AT=0
 SKIP_RETRIES=0
 
 while true; do
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_CODE_FROM" "$MAX_CARDS_CODE" "$START_AT")
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_DOCUMENTER_FROM" "$MAX_CARDS_DOCUMENTER" "$START_AT")
 
 if [[ -z "$ISSUE_IDS" ]]; then
-  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_CODE_FROM. Nothing to code."
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_DOCUMENTER_FROM. Nothing to document."
   break
 fi
 
@@ -43,10 +43,20 @@ for ISSUE_ID in $ISSUE_IDS; do
   DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  log_step "Implementing: $ISSUE_KEY — $TITLE"
+  # Skip if already documented
+  if echo "$COMMENTS" | grep -q "Docs PR opened"; then
+    log_info "$ISSUE_KEY already documented. Skipping."
+    continue
+  fi
+  if echo "$COMMENTS" | grep -q "no documentation changes needed"; then
+    log_info "$ISSUE_KEY already checked — no docs needed. Skipping."
+    continue
+  fi
+
+  log_step "Documenting: $ISSUE_KEY — $TITLE"
 
   BRANCH_SLUG=$(slugify "$TITLE")
-  BRANCH_NAME="claude/${ISSUE_KEY}-${BRANCH_SLUG}"
+  BRANCH_NAME="claude/${ISSUE_KEY}-docs-${BRANCH_SLUG}"
 
   # Safety check
   for protected in $PROTECTED_BRANCHES; do
@@ -77,7 +87,6 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   # Create worktree
   mkdir -p "$WORKTREE_DIR"
-
   git -C "$REPO_ROOT" worktree add "$CARD_WORKTREE" "$BRANCH_NAME" 2>/dev/null || {
     log_error "Could not create worktree for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: worktree creation failed on $(date '+%Y-%m-%d %H:%M')."
@@ -101,38 +110,42 @@ for ISSUE_ID in $ISSUE_IDS; do
   }
 
   # Build prompt
-  PROMPT=$(render_template "$SORTA_ROOT/prompts/code.md" \
+  PROMPT=$(render_template "$SORTA_ROOT/prompts/documenter.md" \
     CARD_KEY "$ISSUE_KEY" \
     CARD_TITLE "$TITLE" \
     CARD_DESCRIPTION "$DESCRIPTION" \
     CARD_COMMENTS "$COMMENTS" \
     BRANCH_NAME "$BRANCH_NAME" \
-    BASE_BRANCH "$GIT_BASE_BRANCH")
+    BASE_BRANCH "$GIT_BASE_BRANCH" \
+    DOCS_DIR "$DOCS_DIR" \
+    DOCS_ORGANIZE_BY "$DOCS_ORGANIZE_BY")
 
   PROMPT_FILE=$(mktemp)
   RESULT_FILE=$(mktemp)
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
-  log_info "Running Claude Code in worktree..."
+  log_info "Running Claude Code in worktree ($CARD_WORKTREE)..."
+  log_info "Prompt file: $PROMPT_FILE ($(wc -c < "$PROMPT_FILE") bytes)"
   claude_rc=0
   run_claude "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
+  log_info "Claude exited with code: $claude_rc"
   if [[ "$claude_rc" -ne 0 ]]; then
-    [[ "$claude_rc" -eq 2 ]] && { git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; }
+    [[ "$claude_rc" -eq 2 ]] && { git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; }
     log_error "Claude failed for $ISSUE_KEY"
-    board_add_comment "$ISSUE_KEY" "Sorta.Fit: implementation failed on $(date '+%Y-%m-%d %H:%M'). Manual intervention needed."
+    board_add_comment "$ISSUE_KEY" "Sorta.Fit: documentation generation failed on $(date '+%Y-%m-%d %H:%M'). Manual intervention needed."
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
-  IMPLEMENTATION_RESULT=$(cat "$RESULT_FILE")
+  DOCUMENTATION_RESULT=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"
 
   # Check for commits
   COMMIT_COUNT=$(git -C "$REPO_ROOT" log "origin/$GIT_BASE_BRANCH..$BRANCH_NAME" --oneline 2>/dev/null | wc -l)
   if [[ "$COMMIT_COUNT" -eq 0 ]]; then
-    log_warn "No commits on branch for $ISSUE_KEY."
-    board_add_comment "$ISSUE_KEY" "Sorta.Fit: no commits produced on $(date '+%Y-%m-%d %H:%M'). Review needed."
+    log_warn "No commits on branch for $ISSUE_KEY — no documentation changes needed."
+    board_add_comment "$ISSUE_KEY" "Sorta.Fit: no documentation changes needed on $(date '+%Y-%m-%d %H:%M')."
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     continue
   fi
@@ -150,69 +163,55 @@ for ISSUE_ID in $ISSUE_IDS; do
   # Create PR
   PR_BODY_FILE=$(mktemp)
   cat > "$PR_BODY_FILE" << PREOF
-## $ISSUE_KEY: $TITLE
+## $ISSUE_KEY: $TITLE — Documentation
 
-### Implementation Notes
-$IMPLEMENTATION_RESULT
+### Documentation Changes
+$DOCUMENTATION_RESULT
 
-### Test Plan
-- [ ] All tests pass
-- [ ] Build succeeds
-- [ ] Acceptance criteria met
-- [ ] Manual QA
+### Review Checklist
+- [ ] Documentation is accurate and matches the feature spec
+- [ ] Existing docs updated where appropriate (not duplicated)
+- [ ] File placement follows \`$DOCS_DIR\` convention
 
 ---
 Automated by Sorta.Fit
 PREOF
 
-  # Retry PR creation — GitHub may not have indexed the pushed ref yet
-  pr_created=false
-  for attempt in 1 2 3; do
-    PR_URL=$("$GH_CMD" pr create \
-      --title "$ISSUE_KEY: $TITLE" \
-      --body-file "$PR_BODY_FILE" \
-      --base "$GIT_BASE_BRANCH" \
-      --head "$BRANCH_NAME" 2>&1) && {
-      pr_created=true
-      break
-    }
-    if [[ $attempt -lt 3 ]]; then
-      log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
-      sleep 5
-    fi
-  done
-
-  if [[ "$pr_created" != "true" ]]; then
-    log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
+  PR_URL=$("$GH_CMD" pr create \
+    --title "$ISSUE_KEY: docs — $TITLE" \
+    --body-file "$PR_BODY_FILE" \
+    --base "$GIT_BASE_BRANCH" \
+    --head "$BRANCH_NAME" 2>&1) || {
+    log_error "PR creation failed for $ISSUE_KEY: $PR_URL"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
-    if [[ -n "$RUNNER_CODE_TO" ]]; then
-      local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
+    if [[ -n "$RUNNER_DOCUMENTER_TO" ]]; then
+      local_transition="TRANSITION_TO_${RUNNER_DOCUMENTER_TO}"
       if [[ -n "${!local_transition:-}" ]]; then
         board_transition "$ISSUE_KEY" "${!local_transition}"
       else
-        log_warn "No transition mapping found for status $RUNNER_CODE_TO. Add $local_transition to your adapter config."
+        log_warn "No transition mapping found for status $RUNNER_DOCUMENTER_TO. Add $local_transition to your adapter config."
       fi
     fi
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PR_BODY_FILE"
     continue
-  fi
+  }
 
   rm -f "$PR_BODY_FILE"
   log_info "PR created: $PR_URL"
 
-  board_add_comment "$ISSUE_KEY" "PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+  board_add_comment "$ISSUE_KEY" "Docs PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
 
-  if [[ -n "$RUNNER_CODE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
+  if [[ -n "$RUNNER_DOCUMENTER_TO" ]]; then
+    local_transition="TRANSITION_TO_${RUNNER_DOCUMENTER_TO}"
     if [[ -n "${!local_transition:-}" ]]; then
       board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY implemented and moved to $RUNNER_CODE_TO"
+      log_info "Done: $ISSUE_KEY documented and moved to $RUNNER_DOCUMENTER_TO"
     else
-      log_warn "No transition mapping found for status $RUNNER_CODE_TO — card implemented but not moved. Add $local_transition to your adapter config."
+      log_warn "No transition mapping found for status $RUNNER_DOCUMENTER_TO — card documented but not moved. Add $local_transition to your adapter config."
     fi
   else
-    log_info "Done: $ISSUE_KEY implemented (no transition configured)"
+    log_info "Done: $ISSUE_KEY documented (no transition configured)"
   fi
 
   git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
@@ -225,7 +224,7 @@ if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
   log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
   break
 fi
-START_AT=$((START_AT + MAX_CARDS_CODE))
+START_AT=$((START_AT + MAX_CARDS_DOCUMENTER))
 log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done
 

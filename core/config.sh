@@ -26,9 +26,43 @@ case "$BOARD_ADAPTER" in
   jira|linear|github-issues) ;;
   *) echo "ERROR: Unknown adapter: $BOARD_ADAPTER"; exit 1 ;;
 esac
+
+# Validate board domain (prevent injection into URLs)
+if [[ ! "$BOARD_DOMAIN" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+[a-zA-Z0-9]$ ]]; then
+  echo "ERROR: Invalid BOARD_DOMAIN: $BOARD_DOMAIN"
+  exit 1
+fi
 : "${BOARD_DOMAIN:?BOARD_DOMAIN not set}"
 : "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"
+
+# TARGET_REPO — the repository sorta.fit operates on
+if [[ -n "${TARGET_REPO:-}" ]]; then
+  # Reject relative paths
+  if [[ "$TARGET_REPO" != /* ]]; then
+    echo "ERROR: TARGET_REPO must be an absolute path (got: $TARGET_REPO)"
+    exit 1
+  fi
+  if [[ ! -d "$TARGET_REPO" ]]; then
+    echo "ERROR: TARGET_REPO does not exist: $TARGET_REPO"
+    exit 1
+  fi
+  if ! git -C "$TARGET_REPO" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "ERROR: TARGET_REPO is not a git repository: $TARGET_REPO"
+    exit 1
+  fi
+  export TARGET_REPO
+else
+  # Fallback: infer from current working directory
+  if TARGET_REPO=$(git rev-parse --show-toplevel 2>/dev/null); then
+    export TARGET_REPO
+    source "$SORTA_ROOT/core/utils.sh" 2>/dev/null || true
+    log_warn "TARGET_REPO is not set. Falling back to git repo at $TARGET_REPO. Set TARGET_REPO in .env to silence this warning." 2>/dev/null || true
+  else
+    echo "ERROR: TARGET_REPO is not set and current directory is not inside a git repository."
+    exit 1
+  fi
+fi
 
 # Optional with defaults
 export GIT_BASE_BRANCH="${GIT_BASE_BRANCH:-main}"
@@ -39,7 +73,9 @@ export MAX_CARDS_CODE="${MAX_CARDS_CODE:-2}"
 export MAX_CARDS_REVIEW="${MAX_CARDS_REVIEW:-10}"
 export MAX_CARDS_TRIAGE="${MAX_CARDS_TRIAGE:-5}"
 export MAX_CARDS_BOUNCE="${MAX_CARDS_BOUNCE:-10}"
+export MAX_CARDS_MERGE="${MAX_CARDS_MERGE:-10}"
 export RUNNERS_ENABLED="${RUNNERS_ENABLED:-refine,code}"
+export MAX_SKIP_RETRIES="${MAX_SKIP_RETRIES:-3}"
 
 # Adapter-specific
 export BOARD_EMAIL="${BOARD_EMAIL:-}"
@@ -68,6 +104,17 @@ export RUNNER_BOUNCE_FROM="${RUNNER_BOUNCE_FROM:-}"
 export RUNNER_BOUNCE_TO="${RUNNER_BOUNCE_TO:-}"
 export MAX_BOUNCES="${MAX_BOUNCES:-3}"
 export RUNNER_BOUNCE_ESCALATE="${RUNNER_BOUNCE_ESCALATE:-}"
+
+export RUNNER_MERGE_FROM="${RUNNER_MERGE_FROM:-}"
+export RUNNER_MERGE_TO="${RUNNER_MERGE_TO:-}"
+export MERGE_STRATEGY="${MERGE_STRATEGY:-merge}"
+export GIT_RELEASE_BRANCH="${GIT_RELEASE_BRANCH:-}"
+
+export RUNNER_DOCUMENTER_FROM="${RUNNER_DOCUMENTER_FROM:-}"
+export RUNNER_DOCUMENTER_TO="${RUNNER_DOCUMENTER_TO:-}"
+export MAX_CARDS_DOCUMENTER="${MAX_CARDS_DOCUMENTER:-5}"
+export DOCS_DIR="${DOCS_DIR:-docs}"
+export DOCS_ORGANIZE_BY="${DOCS_ORGANIZE_BY:-feature}"
 
 # Load adapter config
 ADAPTER_CONFIG="$SORTA_ROOT/adapters/${BOARD_ADAPTER}.config.sh"
