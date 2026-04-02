@@ -696,6 +696,24 @@ async function handleRunnerStatus(req, res) {
   sendJSON(res, 200, { running, pid: runnerPID });
 }
 
+async function handleLogs(req, res) {
+  const logPath = path.join(PROJECT_ROOT, 'runner.log');
+
+  if (!fs.existsSync(logPath)) {
+    return sendJSON(res, 200, { success: true, logs: '', empty: true });
+  }
+
+  try {
+    const content = fs.readFileSync(logPath, 'utf8');
+    const lines = content.split('\n');
+    const tail = lines.slice(-200).join('\n');
+    const stripped = tail.replace(/\x1b\[[0-9;]*m/g, '');
+    sendJSON(res, 200, { success: true, logs: stripped, empty: false });
+  } catch (err) {
+    sendJSON(res, 500, { success: false, message: `Failed to read logs: ${err.message}` });
+  }
+}
+
 // ─── Route table ────────────────────────────────────────────────────
 
 const API_ROUTES = {
@@ -707,6 +725,7 @@ const API_ROUTES = {
   '/api/start-runner':       handleStartRunner,
   '/api/stop-runner':        handleStopRunner,
   '/api/runner-status':      handleRunnerStatus,
+  '/api/logs':               handleLogs,
 };
 
 // ─── Static file server ─────────────────────────────────────────────

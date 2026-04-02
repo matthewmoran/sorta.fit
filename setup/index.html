@@ -580,6 +580,71 @@ select option:disabled {
     min-width: 30px;
   }
 }
+
+/* Log viewer modal */
+.log-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.log-overlay.visible {
+  display: flex;
+}
+.log-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease;
+}
+.log-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.log-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.log-modal-header .log-actions {
+  display: flex;
+  gap: 8px;
+}
+.log-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  min-height: 200px;
+}
+.log-modal-body pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+.log-modal-body .log-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 40px 0;
+}
 </style>
 </head>
 <body>
@@ -590,6 +655,21 @@ select option:disabled {
   </div>
   <div class="step-indicator" id="stepIndicator"></div>
   <div class="card" id="wizardCard"></div>
+</div>
+
+<div class="log-overlay" id="logOverlay">
+  <div class="log-modal">
+    <div class="log-modal-header">
+      <h3>Runner Logs</h3>
+      <div class="log-actions">
+        <button class="btn btn-secondary" onclick="window._wizRefreshLogs()" style="padding:6px 12px;font-size:13px">Refresh</button>
+        <button class="btn btn-secondary" onclick="window._wizCloseLogs()" style="padding:6px 12px;font-size:13px">Close</button>
+      </div>
+    </div>
+    <div class="log-modal-body" id="logContent">
+      <div class="log-empty">Loading...</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1455,6 +1535,7 @@ select option:disabled {
     }
 
     html += '<button class="btn btn-secondary" onclick="window._wizCheckStatus()">Refresh Status</button>' +
+      '<button class="btn btn-secondary" onclick="window._wizViewLogs()">View Logs</button>' +
       '</div>' +
       '<div id="runnerMsg" class="msg"></div>';
 
@@ -1562,6 +1643,40 @@ select option:disabled {
       showMsg("runnerMsg", "error", "Failed to fetch status: " + e.message);
     }
   };
+
+  window._wizViewLogs = function() {
+    document.getElementById("logOverlay").classList.add("visible");
+    window._wizRefreshLogs();
+  };
+
+  window._wizCloseLogs = function() {
+    document.getElementById("logOverlay").classList.remove("visible");
+  };
+
+  window._wizRefreshLogs = async function() {
+    var container = document.getElementById("logContent");
+    container.innerHTML = '<div class="log-empty">Loading...</div>';
+    try {
+      var data = await apiPost("/api/logs");
+      if (data.empty || !data.logs) {
+        container.innerHTML = '<div class="log-empty">No logs yet. Start the runner to generate logs.</div>';
+      } else {
+        var pre = document.createElement("pre");
+        pre.textContent = data.logs;
+        container.innerHTML = "";
+        container.appendChild(pre);
+        container.scrollTop = container.scrollHeight;
+      }
+    } catch(e) {
+      container.innerHTML = '<div class="log-empty">Failed to load logs: ' + escHtml(e.message) + '</div>';
+    }
+  };
+
+  document.getElementById("logOverlay").addEventListener("click", function(e) {
+    if (e.target === this) {
+      window._wizCloseLogs();
+    }
+  });
 
   function startStatusPolling() {
     stopStatusPolling();
