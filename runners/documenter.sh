@@ -43,6 +43,16 @@ for ISSUE_ID in $ISSUE_IDS; do
   DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
+  # Skip if already documented
+  if echo "$COMMENTS" | grep -q "Docs PR opened"; then
+    log_info "$ISSUE_KEY already documented. Skipping."
+    continue
+  fi
+  if echo "$COMMENTS" | grep -q "no documentation changes needed"; then
+    log_info "$ISSUE_KEY already checked — no docs needed. Skipping."
+    continue
+  fi
+
   log_step "Documenting: $ISSUE_KEY — $TITLE"
 
   BRANCH_SLUG=$(slugify "$TITLE")
