@@ -612,7 +612,8 @@ select option:disabled {
     { id: "code", name: "Code", desc: "Implement cards in isolated worktrees, open PRs automatically." },
     { id: "review", name: "Review", desc: "Review PR diffs and post structured feedback on GitHub." },
     { id: "triage", name: "Triage", desc: "Analyze bug reports, identify root causes, write triage reports." },
-    { id: "bounce", name: "Bounce", desc: "Move cards with rejected PR reviews back for automated rework." }
+    { id: "bounce", name: "Bounce", desc: "Move cards with rejected PR reviews back for automated rework." },
+    { id: "documenter", name: "Documenter", desc: "Generate and maintain project docs from card specs." }
   ];
 
   var state = {
@@ -636,7 +637,8 @@ select option:disabled {
         code:    { fromId: "", toId: "", maxCards: 2 },
         review:  { fromId: "", toId: "", maxCards: 10 },
         triage:  { fromId: "", toId: "", maxCards: 5 },
-        bounce:  { fromId: "", toId: "", maxCards: 10 }
+        bounce:  { fromId: "", toId: "", maxCards: 10 },
+        documenter: { fromId: "", toId: "", maxCards: 5 }
       }
     },
     runner: {
@@ -1231,6 +1233,7 @@ select option:disabled {
       state.config.routing.review = { fromId: qaId, toId: "", maxCards: 10 };
       state.config.routing.triage = { fromId: todoId, toId: refinedId, maxCards: 5 };
       state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
       renderCard();
       showMsg("configMsg", "success", "Human gates setup applied. You review specs before implementation and PRs before merge.");
     } else {
@@ -1240,6 +1243,7 @@ select option:disabled {
       state.config.routing.review = { fromId: qaId, toId: doneId || "", maxCards: 10 };
       state.config.routing.triage = { fromId: todoId, toId: agentId, maxCards: 5 };
       state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
       renderCard();
       showMsg("configMsg", "info", "Fully autonomous setup applied. Note: auto-merge is not yet implemented -- PR merge to Done still requires a human step.");
     }
@@ -1381,7 +1385,7 @@ select option:disabled {
       };
 
       // Add per-recipe routing and max cards
-      var recipeIds = ["refine", "code", "review", "triage", "bounce"];
+      var recipeIds = ["refine", "code", "review", "triage", "bounce", "documenter"];
       for (var i = 0; i < recipeIds.length; i++) {
         var rid = recipeIds[i];
         var upper = rid.toUpperCase();
@@ -1633,7 +1637,7 @@ select option:disabled {
           state.config.recipes = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
         }
 
-        var recipeIds = ["refine", "code", "review", "triage", "bounce"];
+        var recipeIds = ["refine", "code", "review", "triage", "bounce", "documenter"];
         for (var i = 0; i < recipeIds.length; i++) {
           var rid = recipeIds[i];
           var upper = rid.toUpperCase();

@@ -10,6 +10,7 @@ Recipes are the individual automation steps that Sorta runs. Each recipe reads c
 | code | Agent | QA | Yes | Implements card, creates branch and PR |
 | review | QA | QA | No | Reviews PR, posts GitHub review |
 | triage | To Do | Refined | Yes | Analyzes bug report, adds triage to description |
+| documenter | (configurable) | (configurable) | Yes | Generates/updates feature docs, opens PR |
 | release-notes | (manual) | stdout | No | Generates changelog from git history |
 
 ---
@@ -206,6 +207,74 @@ Edit `prompts/triage.md`. The template uses these placeholders:
 | `{{CARD_KEY}}` | Issue key |
 | `{{CARD_TITLE}}` | Card title |
 | `{{CARD_DESCRIPTION}}` | Current description (the bug report) |
+
+---
+
+## documenter
+
+**File:** `recipes/documenter.sh`
+**Prompt:** `prompts/documenter.md`
+
+### What It Does
+
+Picks up cards from a configurable lane (default: Done). For each card:
+
+1. Creates a feature branch named `claude/{ISSUE_KEY}-docs-{slug}` from `origin/{GIT_BASE_BRANCH}`
+2. Creates a git worktree in `.worktrees/{ISSUE_KEY}` (never touches the main working tree)
+3. Copies Claude permissions (`.claude/settings.local.json`) into the worktree
+4. Installs dependencies (`npm ci` with fallback to `npm install`)
+5. Runs Claude Code with the documentation prompt, giving it the card spec, comments, and the target docs directory
+6. Claude reads the card spec and relevant source code, then creates or updates markdown files in `{DOCS_DIR}/features/`
+7. If Claude produces commits, pushes the branch and creates a PR via `gh pr create`
+8. Adds a comment to the card with the PR URL
+9. Transitions the card to the configured lane
+10. Removes the worktree
+
+Documentation is organized by **overall feature**, not by individual card. If an existing doc covers the feature, Claude updates it rather than creating a new file. Enhancements to existing features revise the existing document.
+
+### Lane Flow
+
+```
+(configurable) --> [worktree + Claude writes docs] --> branch pushed --> PR created --> (configurable)
+```
+
+### Config Variables
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `MAX_CARDS_DOCUMENTER` | `5` | Maximum cards to process per cycle |
+| `GIT_BASE_BRANCH` | `main` | Base branch for new feature branches |
+| `DOCS_DIR` | `docs` | Target directory for generated documentation |
+| `DOCS_ORGANIZE_BY` | `feature` | Organization strategy for doc files |
+
+### Safety Features
+
+- Branches are always prefixed with `claude/` and include `-docs-` plus the issue key.
+- A protected-branch check prevents accidental work on `main`, `master`, `dev`, or `develop`.
+- Work happens in isolated git worktrees, so the main working tree is never modified.
+- If Claude produces zero commits, the card is not moved; a comment is added noting no changes were needed.
+- No force pushes are ever used.
+
+### Running Standalone
+
+```bash
+bash recipes/documenter.sh
+```
+
+### Customizing the Prompt
+
+Edit `prompts/documenter.md`. The template uses these placeholders:
+
+| Placeholder | Value |
+|-------------|-------|
+| `{{CARD_KEY}}` | Issue key |
+| `{{CARD_TITLE}}` | Card title |
+| `{{CARD_DESCRIPTION}}` | Full card description (the spec) |
+| `{{CARD_COMMENTS}}` | All comments on the card |
+| `{{BRANCH_NAME}}` | The feature branch name |
+| `{{BASE_BRANCH}}` | The base branch name |
+| `{{DOCS_DIR}}` | Target docs directory |
+| `{{DOCS_ORGANIZE_BY}}` | Organization strategy |
 
 ---
 
