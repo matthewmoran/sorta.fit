@@ -77,11 +77,14 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   log_info "Running Claude for review..."
-  (claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>/dev/null) || {
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" "$SORTA_ROOT" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for review of $ISSUE_KEY"
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   REVIEW=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"

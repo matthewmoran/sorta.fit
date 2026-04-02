@@ -52,11 +52,14 @@ for ISSUE_ID in $ISSUE_IDS; do
   RESULT_FILE=$(mktemp)
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
-  (cd "$SORTA_ROOT" && claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>/dev/null) || {
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" "$SORTA_ROOT" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY, skipping"
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   if [[ ! -s "$RESULT_FILE" ]]; then
     log_error "Empty response for $ISSUE_KEY, skipping"

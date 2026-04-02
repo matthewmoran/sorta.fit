@@ -89,7 +89,7 @@ for ISSUE_ID in $ISSUE_IDS; do
     cp "$REPO_ROOT/.claude/settings.local.json" "$CARD_WORKTREE/.claude/settings.local.json"
   else
     log_warn "Missing .claude/settings.local.json — Claude Code won't have permissions to write files or run commands."
-    log_warn "Create it with: echo '{\"permissions\":{\"allow\":[\"Bash(*)\",\"Read(*)\",\"Write(*)\",\"Edit(*)\",\"Glob(*)\",\"Grep(*)\"]}}' > .claude/settings.local.json"
+    log_warn "Create it with: cp .claude/settings.local.json.example .claude/settings.local.json"
   fi
 
   # Install dependencies
@@ -114,14 +114,19 @@ for ISSUE_ID in $ISSUE_IDS; do
   RESULT_FILE=$(mktemp)
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
-  log_info "Running Claude Code in worktree..."
-  (cd "$CARD_WORKTREE" && claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>&1) || {
+  log_info "Running Claude Code in worktree ($CARD_WORKTREE)..."
+  log_info "Prompt file: $PROMPT_FILE ($(wc -c < "$PROMPT_FILE") bytes)"
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
+  log_info "Claude exited with code: $claude_rc"
+  if [[ "$claude_rc" -ne 0 ]]; then
+    [[ "$claude_rc" -eq 2 ]] && { git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; }
     log_error "Claude failed for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: documentation generation failed on $(date '+%Y-%m-%d %H:%M'). Manual intervention needed."
     git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   DOCUMENTATION_RESULT=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"

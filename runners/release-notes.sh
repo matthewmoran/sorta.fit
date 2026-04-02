@@ -45,12 +45,17 @@ $COMMIT_LIST
 
 Output the release notes in markdown format."
 
+PROMPT_FILE=$(mktemp)
 RESULT_FILE=$(mktemp)
-(claude -p "$PROMPT" > "$RESULT_FILE" 2>/dev/null) || {
+printf '%s' "$PROMPT" > "$PROMPT_FILE"
+run_claude "$PROMPT_FILE" "$RESULT_FILE" "$SORTA_ROOT"
+claude_rc=$?
+rm -f "$PROMPT_FILE"
+if [[ "$claude_rc" -ne 0 ]]; then
   log_error "Claude failed to generate release notes"
   rm -f "$RESULT_FILE"
   exit 1
-}
+fi
 
 NOTES=$(cat "$RESULT_FILE")
 rm -f "$RESULT_FILE"
