@@ -62,6 +62,8 @@ All bash scripts must follow these conventions:
 
 6. Document the recipe in `docs/recipes.md` following the format used for existing recipes.
 
+For a comprehensive guide covering the runner anatomy, prompt templates, .env configuration, and the board adapter interface, see [Writing New Runners](writing-runners.md).
+
 ## Adding an Adapter
 
 1. Create `adapters/{name}.sh` implementing all `board_*` functions documented in `docs/adapters.md`.

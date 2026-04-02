@@ -89,7 +89,7 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 
 ## Extension Points
 
-- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`
+- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`. See [`docs/writing-runners.md`](docs/writing-runners.md) for a complete step-by-step guide.
 - **New adapter:** Create `adapters/{name}.sh` implementing all `board_*` functions + `adapters/{name}.config.sh.example`
 
 ## Configuration
