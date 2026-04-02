@@ -9,8 +9,8 @@ else
 fi
 
 log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_step()  { echo -e "${BLUE}[STEP]${NC} $*"; }
 
 # Check if a command exists, print install help if not

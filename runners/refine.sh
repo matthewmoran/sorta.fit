@@ -19,20 +19,20 @@ if [[ -z "$ISSUE_IDS" ]]; then
 fi
 
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
 
   # Check type filter
   if [[ -n "$RUNNER_REFINE_FILTER_TYPE" ]]; then
-    CARD_TYPE=$(board_get_card_type "$ISSUE_KEY")
+    CARD_TYPE=$(board_get_card_type "$ISSUE_KEY") || { log_warn "Failed to fetch type for $ISSUE_KEY. Skipping."; continue; }
     if ! matches_type_filter "$CARD_TYPE" "$RUNNER_REFINE_FILTER_TYPE"; then
       log_info "Skipping $ISSUE_KEY (type: $CARD_TYPE, filter: $RUNNER_REFINE_FILTER_TYPE)"
       continue
     fi
   fi
 
-  TITLE=$(board_get_card_title "$ISSUE_KEY")
-  DESCRIPTION=$(board_get_card_description "$ISSUE_KEY")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
+  DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   log_step "Refining: $ISSUE_KEY — $TITLE"
 
