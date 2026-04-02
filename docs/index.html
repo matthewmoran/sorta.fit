@@ -556,14 +556,29 @@ footer a:hover {
       <p>Turns card titles into structured specs with acceptance criteria, technical context, and testing requirements.</p>
     </div>
     <div class="recipe-card" data-reveal>
+      <h3>Architect</h3>
+      <div class="lane">Refined &#8594; Architected</div>
+      <p>Analyzes the codebase and produces an implementation plan with file targets, dependencies, and trade-offs.</p>
+    </div>
+    <div class="recipe-card" data-reveal>
       <h3>Code</h3>
       <div class="lane">Agent &#8594; QA</div>
       <p>Implements features in isolated worktrees, runs tests, and opens pull requests automatically.</p>
     </div>
     <div class="recipe-card" data-reveal>
       <h3>Review</h3>
-      <div class="lane">QA &#8594; Done</div>
+      <div class="lane">QA</div>
       <p>Fetches PR diffs, runs a structured code review, and posts it directly on GitHub.</p>
+    </div>
+    <div class="recipe-card" data-reveal>
+      <h3>Bounce</h3>
+      <div class="lane">QA &#8594; Agent</div>
+      <p>Detects rejected PR reviews and sends cards back for rework. Escalates to a human after 3 attempts.</p>
+    </div>
+    <div class="recipe-card" data-reveal>
+      <h3>Merge</h3>
+      <div class="lane">QA &#8594; Done</div>
+      <p>Merges approved pull requests with a configurable merge strategy and transitions the card to done.</p>
     </div>
     <div class="recipe-card" data-reveal>
       <h3>Triage</h3>
@@ -571,9 +586,9 @@ footer a:hover {
       <p>Analyzes bug reports against the codebase, identifies root causes, and writes triage reports.</p>
     </div>
     <div class="recipe-card" data-reveal>
-      <h3>Bounce</h3>
-      <div class="lane">QA &#8594; Agent</div>
-      <p>Detects rejected PR reviews and sends cards back for rework. Escalates to a human after 3 attempts.</p>
+      <h3>Documenter</h3>
+      <div class="lane">Configurable</div>
+      <p>Generates and updates project docs from card specs in isolated worktrees, then opens a PR.</p>
     </div>
     <div class="recipe-card" data-reveal>
       <h3>Release Notes</h3>
@@ -602,8 +617,8 @@ footer a:hover {
       <p>No destructive git operations. No --force. No reset --hard.</p>
     </div>
     <div class="safety-item" data-reveal>
-      <h4>Human merge</h4>
-      <p>Sorta opens PRs. You decide what ships.</p>
+      <h4>Merge control</h4>
+      <p>Sorta opens PRs. Auto-merge is available, but you can keep the final call.</p>
     </div>
     <div class="safety-item" data-reveal>
       <h4>Bounce limits</h4>
