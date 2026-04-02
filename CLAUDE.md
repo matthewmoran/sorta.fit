@@ -71,6 +71,10 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 
 `prompts/*.md` files use `{{KEY}}` placeholders (e.g., `{{CARD_KEY}}`, `{{CARD_TITLE}}`), rendered at runtime by `render_template` in `core/utils.sh`.
 
+## Working on This Codebase
+
+- **Do not guess at bug fixes.** When an error is reported, trace the exact code path, read the relevant code, and identify the root cause with evidence before making changes. For bug fixes, describe the proposed fix and wait for confirmation — sometimes the initial direction is wrong and guessing creates new bugs that waste time undoing. For straightforward feature work, implementation can proceed without asking at each step.
+
 ## Shared Runner Library
 
 `core/runner-lib.sh` provides shared functions used across runners. **All runners must source it** after `utils.sh` and the adapter:
