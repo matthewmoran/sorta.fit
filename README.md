@@ -36,6 +36,18 @@ The adapter layer means Sorta.Fit is not tied to any one board. Implement the `b
 
 On Windows, the runner and all scripts run inside Git Bash. Git for Windows includes this automatically.
 
+### Claude Code Permissions
+
+Sorta.Fit runs Claude Code in isolated worktrees to implement cards. Claude Code requires a `.claude/settings.local.json` file to have permission to write files, run commands, and use git. Without it, Claude will read the spec but won't be able to create any code.
+
+Copy the example file to get started:
+
+```bash
+cp .claude/settings.local.json.example .claude/settings.local.json
+```
+
+This file is gitignored (it's user-specific) so each developer needs their own copy.
+
 ## Quick Start
 
 ### Setup Wizard (recommended)
