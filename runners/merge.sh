@@ -30,9 +30,9 @@ if [[ -z "$ISSUE_IDS" ]]; then
 fi
 
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
-  TITLE=$(board_get_card_title "$ISSUE_KEY")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   # Find PR URL in comments
   PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
