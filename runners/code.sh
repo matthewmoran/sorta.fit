@@ -171,15 +171,21 @@ PREOF
   if [[ -n "$EXISTING_PR_URL" && "$EXISTING_PR_URL" != "null" ]]; then
     # Rework case — update existing PR instead of creating a duplicate
     PR_URL="$EXISTING_PR_URL"
-    "$GH_CMD" pr edit "$PR_URL" --body-file "$PR_BODY_FILE" 2>/dev/null || {
+    pr_edit_ok=false
+    "$GH_CMD" pr edit "$PR_URL" --body-file "$PR_BODY_FILE" 2>/dev/null && pr_edit_ok=true || {
       log_warn "Failed to update PR body for $PR_URL"
     }
     "$GH_CMD" pr comment "$PR_URL" --body "Rework pushed by Sorta.Fit — ready for re-review" 2>/dev/null || {
       log_warn "Failed to post rework comment on $PR_URL"
     }
     rm -f "$PR_BODY_FILE"
-    log_info "PR updated: $PR_URL"
-    board_add_comment "$ISSUE_KEY" "PR updated: $PR_URL — Rework pushed by Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+    if [[ "$pr_edit_ok" == true ]]; then
+      log_info "PR updated: $PR_URL"
+      board_add_comment "$ISSUE_KEY" "PR updated: $PR_URL — Rework pushed by Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+    else
+      log_warn "PR body update failed, but rework commits pushed to branch"
+      board_add_comment "$ISSUE_KEY" "Rework pushed to branch (PR body update failed): $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+    fi
   else
     # New PR case — create with retry (GitHub may not have indexed the pushed ref yet)
     pr_created=false

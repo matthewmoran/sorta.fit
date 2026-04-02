@@ -39,6 +39,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   fi
 
   # Check if already reviewed by Sorta.Fit (allow re-review after rework)
+  # Assumes comments are returned in chronological order (line N < line M ⟹ N is older)
   if echo "$COMMENTS" | grep -q "Code Review —"; then
     last_review_line=$(echo "$COMMENTS" | grep -n "Code Review —" | tail -1 | cut -d: -f1)
     last_rework_line=$(echo "$COMMENTS" | grep -n "Rework pushed by Sorta.Fit" | tail -1 | cut -d: -f1)
