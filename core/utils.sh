@@ -131,7 +131,7 @@ RATE_LIMIT_FILE="${SORTA_ROOT:-.}/.rate-limited"
 run_claude() {
   local prompt_file="$1"
   local result_file="$2"
-  local work_dir="${3:-$SORTA_ROOT}"
+  local work_dir="${3:-${TARGET_REPO:-$SORTA_ROOT}}"
   local stderr_file
   stderr_file=$(mktemp)
 

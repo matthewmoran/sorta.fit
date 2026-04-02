@@ -23,7 +23,7 @@ GH_CMD=$(find_gh)
 log_info "Generating release notes since: $SINCE"
 
 # Get commit log
-GIT_LOG=$(git log "$SINCE..HEAD" --pretty=format:"%H|%s" --no-merges 2>/dev/null || true)
+GIT_LOG=$(git -C "$TARGET_REPO" log "$SINCE..HEAD" --pretty=format:"%H|%s" --no-merges 2>/dev/null || true)
 
 if [[ -z "$GIT_LOG" ]]; then
   log_warn "No commits found since $SINCE"
@@ -48,7 +48,7 @@ Output the release notes in markdown format."
 PROMPT_FILE=$(mktemp)
 RESULT_FILE=$(mktemp)
 printf '%s' "$PROMPT" > "$PROMPT_FILE"
-run_claude "$PROMPT_FILE" "$RESULT_FILE" "$SORTA_ROOT"
+run_claude "$PROMPT_FILE" "$RESULT_FILE"
 claude_rc=$?
 rm -f "$PROMPT_FILE"
 if [[ "$claude_rc" -ne 0 ]]; then

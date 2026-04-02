@@ -631,6 +631,7 @@ select option:disabled {
       email: "",
       apiToken: "",
       projectKey: "",
+      targetRepo: "",
       baseBranch: "main",
       pollInterval: 60,
       recipes: ["refine", "code"],
@@ -1286,6 +1287,11 @@ select option:disabled {
     var html = '<h2>Git Settings</h2>' +
       '<p>Configure version control and polling parameters.</p>' +
       '<div class="form-group">' +
+        '<label for="targetRepo">Target Repository</label>' +
+        '<span class="hint">Absolute path to the project repo sorta.fit will operate on (leave blank to use current directory)</span>' +
+        '<input type="text" id="targetRepo" value="' + escHtml(c.targetRepo) + '" placeholder="/absolute/path/to/your/project" onchange="window._wizGitField(\'targetRepo\', this.value)" />' +
+      '</div>' +
+      '<div class="form-group">' +
         '<label for="baseBranch">Base Branch</label>' +
         '<span class="hint">Feature branches will be created from this branch</span>' +
         '<input type="text" id="baseBranch" value="' + escHtml(c.baseBranch) + '" onchange="window._wizGitField(\'baseBranch\', this.value)" />' +
@@ -1344,6 +1350,7 @@ select option:disabled {
     html += '<div class="summary-section">' +
       '<h3>Git Settings</h3>' +
       '<table class="summary-table">' +
+        '<tr><td>Target Repository</td><td>' + (c.targetRepo ? escHtml(c.targetRepo) : '(current directory)') + '</td></tr>' +
         '<tr><td>Base Branch</td><td>' + escHtml(c.baseBranch) + '</td></tr>' +
         '<tr><td>Poll Interval</td><td>' + c.pollInterval + ' minutes</td></tr>' +
       '</table></div>';
@@ -1388,6 +1395,7 @@ select option:disabled {
         BOARD_API_TOKEN: c.apiToken,
         BOARD_PROJECT_KEY: c.projectKey,
         BOARD_EMAIL: c.email,
+        TARGET_REPO: c.targetRepo || "",
         GIT_BASE_BRANCH: c.baseBranch,
         POLL_INTERVAL: String((c.pollInterval || 60) * 60),
         RUNNERS_ENABLED: (c.recipes || []).join(",")
@@ -1652,6 +1660,7 @@ select option:disabled {
         state.config.email = env.BOARD_EMAIL || "";
         state.config.apiToken = env.BOARD_API_TOKEN || "";
         state.config.projectKey = env.BOARD_PROJECT_KEY || "";
+        state.config.targetRepo = env.TARGET_REPO || "";
         state.config.baseBranch = env.GIT_BASE_BRANCH || "main";
         state.config.pollInterval = env.POLL_INTERVAL ? Math.round(parseInt(env.POLL_INTERVAL) / 60) : 60;
 
