@@ -11,7 +11,7 @@ Review this PR for:
 1. **Code Quality** — Clean code, consistent naming, no dead code, proper error handling
 2. **Architecture** — Follows the project's established patterns and conventions
 3. **Testing** — Tests cover the acceptance criteria, edge cases handled
-4. **Security** — No hardcoded secrets, no injection vulnerabilities, proper input validation
+4. **Security** — No hardcoded secrets/tokens/credentials (even in tests or docs), no injection vulnerabilities, proper input validation, no .env values or internal URLs in committed files
 5. **Performance** — No N+1 queries, no unnecessary re-renders, efficient algorithms
 
 For each issue found, specify:

@@ -41,6 +41,15 @@ CRITICAL SAFETY RULES:
 - ONLY commit and push to the feature branch: {{BRANCH_NAME}}
 - If anything goes wrong, stop immediately
 
+SENSITIVE DATA RULES — documentation must NEVER include:
+- API keys, tokens, passwords, secrets, or credentials (real or example values from .env)
+- Internal hostnames, IP addresses, or infrastructure URLs
+- Email addresses, account IDs, or personal identifiable information
+- Connection strings, database names, or service endpoints
+- Contents of .env, .env.example values that look like real credentials, or any config file containing secrets
+- If you need to reference configuration, use placeholder values like `your-api-token-here` or `mycompany.example.com`
+- When documenting environment variables, describe what they do — never show actual values from the project
+
 After writing documentation:
 - Stage and commit all changes with a clear message referencing {{CARD_KEY}}
 - Do NOT push — the runner handles pushing

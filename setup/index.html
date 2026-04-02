@@ -614,6 +614,7 @@ select option:disabled {
     { id: "review", name: "Review", desc: "Review PR diffs and post structured feedback on GitHub." },
     { id: "triage", name: "Triage", desc: "Analyze bug reports, identify root causes, write triage reports." },
     { id: "bounce", name: "Bounce", desc: "Move cards with rejected PR reviews back for automated rework." },
+    { id: "merge", name: "Merge", desc: "Merge approved PRs and transition cards to Done." },
     { id: "documenter", name: "Documenter", desc: "Generate and maintain project docs from card specs." }
   ];
 
@@ -1227,6 +1228,9 @@ select option:disabled {
     if (!todoId || !refinedId || !agentId || !qaId) {
       showMsg("configMsg", "error", "Could not auto-match all lanes. Your board may use different status names. Configure manually below.");
       return;
+    }
+    if (!doneId) {
+      showMsg("configMsg", "error", "Could not find a 'Done' status. Documenter and merge lanes need to be configured manually below.");
     }
 
     if (mode === "human-gates") {
