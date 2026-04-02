@@ -222,6 +222,13 @@ is_rate_limited() {
   return 1
 }
 
+# Extract the most recent GitHub PR URL from comment text
+# Usage: extract_pr_url "$COMMENTS"
+extract_pr_url() {
+  local text="$1"
+  echo "$text" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | tail -1
+}
+
 # Render a prompt template — replaces {{KEY}} with values
 # Usage: render_template "file.md" KEY1 "value1" KEY2 "value2"
 render_template() {

@@ -31,7 +31,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  # Find PR URL in comments
+  # Find most recent PR URL in comments
   PR_URL=$(extract_pr_url "$COMMENTS")
 
   if [[ -z "$PR_URL" ]]; then
@@ -39,10 +39,16 @@ for ISSUE_ID in $ISSUE_IDS; do
     continue
   fi
 
-  # Check if already reviewed by Sorta.Fit
+  # Check if already reviewed by Sorta.Fit (allow re-review after rework)
+  # Assumes comments are returned in chronological order (line N < line M ⟹ N is older)
   if echo "$COMMENTS" | grep -q "Code Review —"; then
-    log_info "$ISSUE_KEY already reviewed. Skipping."
-    continue
+    last_review_line=$(echo "$COMMENTS" | grep -n "Code Review —" | tail -1 | cut -d: -f1)
+    last_rework_line=$(echo "$COMMENTS" | grep -n "Rework pushed by Sorta.Fit" | tail -1 | cut -d: -f1)
+    if [[ -z "$last_rework_line" ]] || [[ "$last_review_line" -gt "$last_rework_line" ]]; then
+      log_info "$ISSUE_KEY already reviewed. Skipping."
+      continue
+    fi
+    log_info "$ISSUE_KEY has rework after last review. Re-reviewing."
   fi
 
   log_step "Reviewing: $ISSUE_KEY — $PR_URL"
