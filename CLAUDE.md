@@ -24,6 +24,7 @@ bash runners/code.sh
 bash runners/review.sh
 bash runners/triage.sh
 bash runners/bounce.sh
+bash runners/merge.sh
 
 # Generate release notes (manual, not part of the loop)
 bash runners/release-notes.sh <since-tag-or-date> [output-file]
@@ -63,6 +64,7 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 - **review** — Fetches PR diff, runs Claude review, posts verdict to GitHub (QA lane)
 - **triage** — Analyzes bug reports, appends root-cause analysis (To Do → Refined)
 - **bounce** — Detects rejected PRs, routes back for rework or escalates after `MAX_BOUNCES` (QA → Agent)
+- **merge** — Merges approved PRs, transitions card to done (QA → Done)
 
 ### Prompt Templates
 
@@ -92,6 +94,6 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 
 ## Configuration
 
-All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing.
+All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `GIT_RELEASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing.
 
 Runner lane routing uses **Jira status IDs** (not names). `RUNNER_*_FROM` is the status ID to query cards from; `RUNNER_*_TO` is the status ID to transition cards to (resolved via `TRANSITION_TO_<id>` in the adapter config). Run the setup wizard to discover your board's IDs.

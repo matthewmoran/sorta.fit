@@ -92,6 +92,7 @@ For a complete reference of every configuration variable, see the [Setup Guide](
 | `review` | Reviews PR diff, posts GitHub review | QA --> QA (stays) |
 | `triage` | Analyzes bug report, writes triage to card | To Do --> Refined |
 | `bounce` | Moves rejected PRs back for rework | QA --> Agent |
+| `merge` | Merges approved PRs, transitions card to done | QA --> Done |
 | `release-notes` | Generates grouped changelog from git history | Manual run |
 
 Each runner's pickup and result lanes are configurable -- the defaults above match the suggested human-gates workflow.
@@ -108,12 +109,12 @@ You review specs before implementation starts, and review PRs before merging. Th
 [To Do] --refine--> [Refined] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
 ```
 
-### Fully Autonomous (work in progress)
+### Fully Autonomous
 
-Everything automated end-to-end. Auto-merge is not yet implemented -- PR merge to Done still requires a human step.
+Everything automated end-to-end. The merge runner closes the loop by merging approved PRs and transitioning cards to Done.
 
 ```
-[To Do] --refine--> [Agent] --code--> [QA] --review--> [Done]
+[To Do] --refine--> [Agent] --code--> [QA] --review--> [QA] --merge--> [Done]
 ```
 
 ## Supported Boards
