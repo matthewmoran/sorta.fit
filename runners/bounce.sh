@@ -33,8 +33,8 @@ for ISSUE_ID in $ISSUE_IDS; do
   TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  # Find PR URL in comments
-  PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
+  # Find most recent PR URL in comments
+  PR_URL=$(extract_pr_url "$COMMENTS")
 
   if [[ -z "$PR_URL" ]]; then
     log_info "No PR URL for $ISSUE_KEY. Skipping."
