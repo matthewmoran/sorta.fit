@@ -72,8 +72,12 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   if [[ -n "$RUNNER_REFINE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_REFINE_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY refined and moved to $RUNNER_REFINE_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY refined and moved to $RUNNER_REFINE_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_REFINE_TO — card refined but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY refined (no transition configured)"
   fi

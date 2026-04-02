@@ -77,6 +77,7 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   # Create worktree
   mkdir -p "$WORKTREE_DIR"
+
   git -C "$REPO_ROOT" worktree add "$CARD_WORKTREE" "$BRANCH_NAME" 2>/dev/null || {
     log_error "Could not create worktree for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: worktree creation failed on $(date '+%Y-%m-%d %H:%M')."
@@ -164,12 +165,25 @@ $IMPLEMENTATION_RESULT
 Automated by Sorta.Fit
 PREOF
 
-  PR_URL=$("$GH_CMD" pr create \
-    --title "$ISSUE_KEY: $TITLE" \
-    --body-file "$PR_BODY_FILE" \
-    --base "$GIT_BASE_BRANCH" \
-    --head "$BRANCH_NAME" 2>&1) || {
-    log_error "PR creation failed for $ISSUE_KEY: $PR_URL"
+  # Retry PR creation — GitHub may not have indexed the pushed ref yet
+  pr_created=false
+  for attempt in 1 2 3; do
+    PR_URL=$("$GH_CMD" pr create \
+      --title "$ISSUE_KEY: $TITLE" \
+      --body-file "$PR_BODY_FILE" \
+      --base "$GIT_BASE_BRANCH" \
+      --head "$BRANCH_NAME" 2>&1) && {
+      pr_created=true
+      break
+    }
+    if [[ $attempt -lt 3 ]]; then
+      log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
+      sleep 5
+    fi
+  done
+
+  if [[ "$pr_created" != "true" ]]; then
+    log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
     if [[ -n "$RUNNER_CODE_TO" ]]; then
       local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
@@ -178,7 +192,7 @@ PREOF
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PR_BODY_FILE"
     continue
-  }
+  fi
 
   rm -f "$PR_BODY_FILE"
   log_info "PR created: $PR_URL"
