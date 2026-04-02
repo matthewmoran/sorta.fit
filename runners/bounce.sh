@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 GH_CMD=$(find_gh)
 MAX_BOUNCES="${MAX_BOUNCES:-3}"
@@ -34,7 +35,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   # Find PR URL in comments
-  PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
+  PR_URL=$(extract_pr_url "$COMMENTS")
 
   if [[ -z "$PR_URL" ]]; then
     log_info "No PR URL for $ISSUE_KEY. Skipping."
@@ -56,34 +57,13 @@ for ISSUE_ID in $ISSUE_IDS; do
     board_add_comment "$ISSUE_KEY" "Escalated by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). This card has been bounced $BOUNCE_COUNT times and needs human attention. PR: $PR_URL"
 
     if [[ -n "$BOUNCE_ESCALATE_TO" ]]; then
-      local_transition="TRANSITION_TO_${BOUNCE_ESCALATE_TO}"
-      if [[ -n "${!local_transition:-}" ]]; then
-        board_transition "$ISSUE_KEY" "${!local_transition}"
-        log_info "$ISSUE_KEY escalated to $BOUNCE_ESCALATE_TO"
-      else
-        log_warn "No transition mapping found for status $BOUNCE_ESCALATE_TO — card not escalated. Add $local_transition to your adapter config."
-      fi
+      runner_transition "$ISSUE_KEY" "$BOUNCE_ESCALATE_TO" "escalated"
     fi
     continue
   fi
 
   # Check the PR review state
-  PR_STATE=$("$GH_CMD" pr view "$PR_URL" --json reviewDecision --jq '.reviewDecision' 2>/dev/null || echo "")
-
-  CHANGES_REQUESTED=false
-  if [[ "$PR_STATE" == "CHANGES_REQUESTED" ]]; then
-    CHANGES_REQUESTED=true
-  fi
-
-  # If gh doesn't return reviewDecision, check reviews directly
-  if [[ -z "$PR_STATE" || "$PR_STATE" == "null" ]]; then
-    LATEST_REVIEW=$("$GH_CMD" pr view "$PR_URL" --json reviews --jq '.reviews[-1].state' 2>/dev/null || echo "")
-    if [[ "$LATEST_REVIEW" == "CHANGES_REQUESTED" ]]; then
-      CHANGES_REQUESTED=true
-    fi
-  fi
-
-  if [[ "$CHANGES_REQUESTED" == false ]]; then
+  if ! check_pr_review_state "$PR_URL" "CHANGES_REQUESTED"; then
     log_info "$ISSUE_KEY: PR not rejected. Skipping."
     continue
   fi
@@ -103,17 +83,7 @@ $REVIEW_COMMENTS"
 
   board_add_comment "$ISSUE_KEY" "$BOUNCE_MSG"
 
-  if [[ -n "$RUNNER_BOUNCE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_BOUNCE_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY bounced to $RUNNER_BOUNCE_TO for rework"
-    else
-      log_warn "No transition mapping found for status $RUNNER_BOUNCE_TO — card bounced but not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Done: $ISSUE_KEY bounced (no transition configured)"
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_BOUNCE_TO" "bounced"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 

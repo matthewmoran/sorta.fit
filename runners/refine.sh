@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 log_info "Refiner: checking $RUNNER_REFINE_FROM lane..."
 
@@ -53,11 +54,10 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   claude_rc=0
-  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
-  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then break; fi
   if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY, skipping"
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
@@ -70,17 +70,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   board_update_description "$ISSUE_KEY" "$(cat "$RESULT_FILE")"
   board_add_comment "$ISSUE_KEY" "Card refined by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). Review and move to Agent lane when ready."
 
-  if [[ -n "$RUNNER_REFINE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_REFINE_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY refined and moved to $RUNNER_REFINE_TO"
-    else
-      log_warn "No transition mapping found for status $RUNNER_REFINE_TO — card refined but not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Done: $ISSUE_KEY refined (no transition configured)"
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_REFINE_TO" "refined"
 
   rm -f "$PROMPT_FILE" "$RESULT_FILE"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))

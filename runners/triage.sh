@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 log_info "Triage: checking $RUNNER_TRIAGE_FROM lane for bugs..."
 
@@ -50,11 +51,10 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   claude_rc=0
-  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
-  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then break; fi
   if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY"
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
@@ -76,17 +76,7 @@ $TRIAGE"
   board_update_description "$ISSUE_KEY" "$UPDATED_DESC"
   board_add_comment "$ISSUE_KEY" "Bug triaged by Sorta.Fit on $(date '+%Y-%m-%d %H:%M')."
 
-  if [[ -n "$RUNNER_TRIAGE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_TRIAGE_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY triaged and moved to $RUNNER_TRIAGE_TO"
-    else
-      log_warn "No transition mapping found for status $RUNNER_TRIAGE_TO — card triaged but not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Done: $ISSUE_KEY triaged (no transition configured)"
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_TRIAGE_TO" "triaged"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 
