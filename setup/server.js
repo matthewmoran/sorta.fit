@@ -497,6 +497,7 @@ BOARD_EMAIL=${q(e.BOARD_EMAIL || '')}
 # =============================================================================
 
 GIT_BASE_BRANCH=${q(e.GIT_BASE_BRANCH || 'main')}
+GIT_RELEASE_BRANCH=${q(e.GIT_RELEASE_BRANCH || '')}
 
 # =============================================================================
 # Runner Behavior
@@ -507,10 +508,15 @@ POLL_INTERVAL=${e.POLL_INTERVAL || '3600'}
 
 # Maximum cards per cycle for each runner
 MAX_CARDS_REFINE=${e.MAX_CARDS_REFINE || '5'}
+MAX_CARDS_ARCHITECT=${e.MAX_CARDS_ARCHITECT || '5'}
 MAX_CARDS_CODE=${e.MAX_CARDS_CODE || '2'}
 MAX_CARDS_REVIEW=${e.MAX_CARDS_REVIEW || '10'}
 MAX_CARDS_TRIAGE=${e.MAX_CARDS_TRIAGE || '5'}
 MAX_CARDS_BOUNCE=${e.MAX_CARDS_BOUNCE || '10'}
+MAX_CARDS_MERGE=${e.MAX_CARDS_MERGE || '10'}
+
+# Merge strategy: merge, squash, or rebase
+MERGE_STRATEGY=${e.MERGE_STRATEGY || 'merge'}
 
 # Comma-separated list of runners to run
 RUNNERS_ENABLED=${e.RUNNERS_ENABLED || 'refine,code'}
@@ -521,6 +527,9 @@ RUNNERS_ENABLED=${e.RUNNERS_ENABLED || 'refine,code'}
 
 RUNNER_REFINE_FROM=${e.RUNNER_REFINE_FROM || ''}
 RUNNER_REFINE_TO=${e.RUNNER_REFINE_TO || ''}
+
+RUNNER_ARCHITECT_FROM=${e.RUNNER_ARCHITECT_FROM || ''}
+RUNNER_ARCHITECT_TO=${e.RUNNER_ARCHITECT_TO || ''}
 
 RUNNER_CODE_FROM=${e.RUNNER_CODE_FROM || ''}
 RUNNER_CODE_TO=${e.RUNNER_CODE_TO || ''}
@@ -533,6 +542,9 @@ RUNNER_TRIAGE_TO=${e.RUNNER_TRIAGE_TO || ''}
 
 RUNNER_BOUNCE_FROM=${e.RUNNER_BOUNCE_FROM || ''}
 RUNNER_BOUNCE_TO=${e.RUNNER_BOUNCE_TO || ''}
+
+RUNNER_MERGE_FROM=${e.RUNNER_MERGE_FROM || ''}
+RUNNER_MERGE_TO=${e.RUNNER_MERGE_TO || ''}
 
 MAX_BOUNCES=${e.MAX_BOUNCES || '3'}
 `;

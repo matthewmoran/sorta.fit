@@ -9,8 +9,8 @@ else
 fi
 
 log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_step()  { echo -e "${BLUE}[STEP]${NC} $*"; }
 
 # Check if a command exists, print install help if not
@@ -74,27 +74,33 @@ slugify() {
   echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40
 }
 
-# Lock file management
+# Lock file management (atomic via mkdir)
 lock_acquire() {
-  local lock_file="$1"
-  if [[ -f "$lock_file" ]]; then
-    local lock_pid
-    lock_pid=$(cat "$lock_file" 2>/dev/null)
-    if kill -0 "$lock_pid" 2>/dev/null; then
-      log_warn "Previous cycle (PID $lock_pid) still running. Skipping."
-      return 1
-    else
-      log_warn "Stale lock (PID $lock_pid). Removing."
-      rm -f "$lock_file"
-    fi
+  local lock_dir="$1"
+  if mkdir "$lock_dir" 2>/dev/null; then
+    echo $$ > "$lock_dir/pid"
+    return 0
   fi
-  echo $$ > "$lock_file"
-  return 0
+  # Lock exists — check if the holder is still alive
+  local lock_pid
+  lock_pid=$(cat "$lock_dir/pid" 2>/dev/null || echo "")
+  if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+    log_warn "Previous cycle (PID $lock_pid) still running. Skipping."
+    return 1
+  fi
+  # Stale lock — remove and retry
+  log_warn "Stale lock (PID $lock_pid). Removing."
+  rm -rf "$lock_dir"
+  if mkdir "$lock_dir" 2>/dev/null; then
+    echo $$ > "$lock_dir/pid"
+    return 0
+  fi
+  return 1
 }
 
 lock_release() {
-  local lock_file="$1"
-  rm -f "$lock_file"
+  local lock_dir="$1"
+  rm -rf "$lock_dir"
 }
 
 # Check if a card matches a runner's type filter

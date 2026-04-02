@@ -24,6 +24,7 @@ bash runners/code.sh
 bash runners/review.sh
 bash runners/triage.sh
 bash runners/bounce.sh
+bash runners/merge.sh
 
 # Generate release notes (manual, not part of the loop)
 bash runners/release-notes.sh <since-tag-or-date> [output-file]
@@ -64,6 +65,7 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 - **triage** — Analyzes bug reports, appends root-cause analysis (To Do → Refined)
 - **bounce** — Detects rejected PRs, routes back for rework or escalates after `MAX_BOUNCES` (QA → Agent)
 - **documenter** — Generates/updates project docs from card specs in isolated worktrees, opens PR (configurable lanes)
+- **merge** — Merges approved PRs, transitions card to done (QA → Done)
 
 ### Prompt Templates
 
@@ -88,11 +90,11 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 
 ## Extension Points
 
-- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`
+- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`. See [`docs/writing-runners.md`](docs/writing-runners.md) for a complete step-by-step guide.
 - **New adapter:** Create `adapters/{name}.sh` implementing all `board_*` functions + `adapters/{name}.config.sh.example`
 
 ## Configuration
 
-All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing. The documenter runner also uses `DOCS_DIR` (target directory for generated docs, default `docs`) and `DOCS_ORGANIZE_BY` (organization strategy, default `feature`).
+All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `GIT_RELEASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing. The documenter runner also uses `DOCS_DIR` (target directory for generated docs, default `docs`) and `DOCS_ORGANIZE_BY` (organization strategy, default `feature`).
 
 Runner lane routing uses **Jira status IDs** (not names). `RUNNER_*_FROM` is the status ID to query cards from; `RUNNER_*_TO` is the status ID to transition cards to (resolved via `TRANSITION_TO_<id>` in the adapter config). Run the setup wizard to discover your board's IDs.

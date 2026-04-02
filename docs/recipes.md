@@ -341,3 +341,5 @@ To create a custom recipe:
 4. Create a prompt template in `prompts/{name}.md` with `{{PLACEHOLDER}}` syntax.
 
 5. Add the recipe name to `RECIPES_ENABLED` in `.env` to include it in the polling loop, or run it standalone with `bash recipes/{name}.sh`.
+
+For a detailed walkthrough with annotated code, a skeleton template, and a full checklist, see [Writing New Runners](writing-runners.md).

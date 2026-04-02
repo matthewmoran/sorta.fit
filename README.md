@@ -5,7 +5,7 @@ Autonomous sprint execution powered by Claude Code. Sorta.Fit connects your issu
 It runs in the background on your computer -- as long as it's on, your board keeps moving. Configure human review gates where you need them, or let it handle everything.
 
 ```
-     [To Do] --refine--> [Refined] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
+     [To Do] --refine--> [Refined] --architect--> [Architected] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
 ```
 
 ## Why Sorta.Fit
@@ -35,6 +35,18 @@ The adapter layer means Sorta.Fit is not tied to any one board. Implement the `b
 - **GitHub CLI** ([cli.github.com](https://cli.github.com))
 
 On Windows, the runner and all scripts run inside Git Bash. Git for Windows includes this automatically.
+
+### Claude Code Permissions
+
+Sorta.Fit runs Claude Code in isolated worktrees to implement cards. Claude Code requires a `.claude/settings.local.json` file to have permission to write files, run commands, and use git. Without it, Claude will read the spec but won't be able to create any code.
+
+Copy the example file to get started:
+
+```bash
+cp .claude/settings.local.json.example .claude/settings.local.json
+```
+
+This file is gitignored (it's user-specific) so each developer needs their own copy.
 
 ## Quick Start
 
@@ -76,10 +88,12 @@ For a complete reference of every configuration variable, see the [Setup Guide](
 | Runner | What It Does | Default Flow |
 |--------|-------------|-------------|
 | `refine` | Generates structured spec from card | To Do --> Refined |
+| `architect` | Analyzes codebase, enriches spec with implementation plan | Refined --> Architected |
 | `code` | Implements card, creates branch and PR | Agent --> QA |
 | `review` | Reviews PR diff, posts GitHub review | QA --> QA (stays) |
 | `triage` | Analyzes bug report, writes triage to card | To Do --> Refined |
 | `bounce` | Moves rejected PRs back for rework | QA --> Agent |
+| `merge` | Merges approved PRs, transitions card to done | QA --> Done |
 | `documenter` | Generates docs from card spec, opens PR | (configurable) |
 | `release-notes` | Generates grouped changelog from git history | Manual run |
 
@@ -97,12 +111,12 @@ You review specs before implementation starts, and review PRs before merging. Th
 [To Do] --refine--> [Refined] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
 ```
 
-### Fully Autonomous (work in progress)
+### Fully Autonomous
 
-Everything automated end-to-end. Auto-merge is not yet implemented -- PR merge to Done still requires a human step.
+Everything automated end-to-end. The merge runner closes the loop by merging approved PRs and transitioning cards to Done.
 
 ```
-[To Do] --refine--> [Agent] --code--> [QA] --review--> [Done]
+[To Do] --refine--> [Refined] --architect-->[Agent] --code--> [QA] --review--> [QA] --merge--> [Done]
 ```
 
 ## Supported Boards

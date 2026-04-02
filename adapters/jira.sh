@@ -4,29 +4,60 @@
 
 set -euo pipefail
 
-JIRA_AUTH="$BOARD_EMAIL:$BOARD_API_TOKEN"
+JIRA_AUTH_HEADER="Authorization: Basic $(echo -n "$BOARD_EMAIL:$BOARD_API_TOKEN" | base64 -w 0)"
 JIRA_BASE="https://$BOARD_DOMAIN/rest/api/3"
+
+# Wrapper for Jira API calls — validates response is JSON before returning
+jira_curl() {
+  local tmpfile http_code
+  tmpfile=$(mktemp)
+  http_code=$(curl -s -w "%{http_code}" -o "$tmpfile" "$@") || {
+    rm -f "$tmpfile"
+    log_error "Jira API request failed (network error)"
+    return 1
+  }
+
+  local body
+  body=$(cat "$tmpfile")
+  rm -f "$tmpfile"
+
+  if [[ "$http_code" -ge 400 ]] || [[ "${body:0:1}" == "<" ]]; then
+    log_error "Jira API error (HTTP $http_code)"
+    if [[ "${body:0:1}" == "<" ]]; then
+      log_error "Received HTML instead of JSON — check BOARD_DOMAIN, BOARD_EMAIL, and BOARD_API_TOKEN in .env"
+    fi
+    return 1
+  fi
+
+  printf '%s' "$body"
+}
 
 board_get_cards_in_status() {
   local status="$1"
   local max="${2:-10}"
-  curl -s -X POST \
-    -u "$JIRA_AUTH" \
+  local response
+  response=$(jira_curl -X POST \
+    -H "$JIRA_AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "{\"jql\":\"project=$BOARD_PROJECT_KEY AND status=$status ORDER BY rank ASC\",\"maxResults\":$max}" \
-    "$JIRA_BASE/search/jql" | \
+    "$JIRA_BASE/search/jql") || return 1
+  echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.issues)j.issues.forEach(i=>console.log(i.id));})"
 }
 
 board_get_card_key() {
   local issue_id="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_id" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_id") || return 1
+  echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.key);})"
 }
 
 board_get_card_summary() {
   local issue_key="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key") || return 1
+  echo "$response" | \
     node -e "
       let d='';
       process.stdin.on('data',c=>d+=c);
@@ -42,19 +73,25 @@ board_get_card_summary() {
 
 board_get_card_title() {
   local issue_key="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key") || return 1
+  echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.fields.summary);})"
 }
 
 board_get_card_type() {
   local issue_key="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key") || return 1
+  echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.fields.issuetype.name);})"
 }
 
 board_get_card_description() {
   local issue_key="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key") || return 1
+  echo "$response" | \
     node -e "
       let d='';
       process.stdin.on('data',c=>d+=c);
@@ -74,7 +111,9 @@ board_get_card_description() {
 
 board_get_card_comments() {
   local issue_key="$1"
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$issue_key/comment" | \
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key/comment") || return 1
+  echo "$response" | \
     node -e "
       let d='';
       process.stdin.on('data',c=>d+=c);
@@ -150,7 +189,7 @@ board_update_description() {
     fs.writeFileSync(process.argv[2], JSON.stringify({ fields: { description: { type: 'doc', version: 1, content } } }));
   " "$tmpfile" "$payload_file"
 
-  curl -s -X PUT -u "$JIRA_AUTH" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key"
+  jira_curl -X PUT -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key"
   rm -f "$tmpfile" "$payload_file"
 }
 
@@ -168,31 +207,35 @@ board_add_comment() {
     }));
   " "$comment" "$payload_file"
 
-  curl -s -X POST -u "$JIRA_AUTH" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key/comment"
+  jira_curl -X POST -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key/comment"
   rm -f "$payload_file"
 }
 
 board_transition() {
   local issue_key="$1"
   local transition_id="$2"
-  curl -s -X POST \
-    -u "$JIRA_AUTH" \
+  jira_curl -X POST \
+    -H "$JIRA_AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "{\"transition\":{\"id\":\"$transition_id\"}}" \
     "$JIRA_BASE/issue/$issue_key/transitions"
 }
 
 board_discover() {
+  local response
+
   echo "=== Statuses ==="
-  curl -s -u "$JIRA_AUTH" "$JIRA_BASE/project/$BOARD_PROJECT_KEY/statuses" | \
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/project/$BOARD_PROJECT_KEY/statuses") || return 1
+  echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const seen=new Set();j.forEach(t=>t.statuses.forEach(s=>{if(!seen.has(s.id)){seen.add(s.id);console.log(s.id,'-',s.name)}}));})"
 
   echo ""
   echo "=== Transitions (from first issue) ==="
   local first_id
-  first_id=$(curl -s -X POST -u "$JIRA_AUTH" -H "Content-Type: application/json" \
+  response=$(jira_curl -X POST -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" \
     -d "{\"jql\":\"project=$BOARD_PROJECT_KEY ORDER BY rank ASC\",\"maxResults\":1}" \
-    "$JIRA_BASE/search/jql" | \
+    "$JIRA_BASE/search/jql") || return 1
+  first_id=$(echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.issues&&j.issues[0])console.log(j.issues[0].id);})")
   local first_key=""
   if [[ -n "$first_id" ]]; then
@@ -200,7 +243,8 @@ board_discover() {
   fi
 
   if [[ -n "$first_key" ]]; then
-    curl -s -u "$JIRA_AUTH" "$JIRA_BASE/issue/$first_key/transitions" | \
+    response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$first_key/transitions") || return 1
+    echo "$response" | \
       node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);j.transitions.forEach(t=>console.log(t.id,'-',t.name,'->',t.to.name,'(id:',t.to.id,')'));})"
   else
     echo "No issues found. Create an issue first, then run discover again."

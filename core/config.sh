@@ -26,6 +26,12 @@ case "$BOARD_ADAPTER" in
   jira|linear|github-issues) ;;
   *) echo "ERROR: Unknown adapter: $BOARD_ADAPTER"; exit 1 ;;
 esac
+
+# Validate board domain (prevent injection into URLs)
+if [[ ! "$BOARD_DOMAIN" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+[a-zA-Z0-9]$ ]]; then
+  echo "ERROR: Invalid BOARD_DOMAIN: $BOARD_DOMAIN"
+  exit 1
+fi
 : "${BOARD_DOMAIN:?BOARD_DOMAIN not set}"
 : "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"
@@ -39,6 +45,7 @@ export MAX_CARDS_CODE="${MAX_CARDS_CODE:-2}"
 export MAX_CARDS_REVIEW="${MAX_CARDS_REVIEW:-10}"
 export MAX_CARDS_TRIAGE="${MAX_CARDS_TRIAGE:-5}"
 export MAX_CARDS_BOUNCE="${MAX_CARDS_BOUNCE:-10}"
+export MAX_CARDS_MERGE="${MAX_CARDS_MERGE:-10}"
 export RUNNERS_ENABLED="${RUNNERS_ENABLED:-refine,code}"
 
 # Adapter-specific
@@ -68,6 +75,11 @@ export RUNNER_BOUNCE_FROM="${RUNNER_BOUNCE_FROM:-}"
 export RUNNER_BOUNCE_TO="${RUNNER_BOUNCE_TO:-}"
 export MAX_BOUNCES="${MAX_BOUNCES:-3}"
 export RUNNER_BOUNCE_ESCALATE="${RUNNER_BOUNCE_ESCALATE:-}"
+
+export RUNNER_MERGE_FROM="${RUNNER_MERGE_FROM:-}"
+export RUNNER_MERGE_TO="${RUNNER_MERGE_TO:-}"
+export MERGE_STRATEGY="${MERGE_STRATEGY:-merge}"
+export GIT_RELEASE_BRANCH="${GIT_RELEASE_BRANCH:-}"
 
 export RUNNER_DOCUMENTER_FROM="${RUNNER_DOCUMENTER_FROM:-}"
 export RUNNER_DOCUMENTER_TO="${RUNNER_DOCUMENTER_TO:-}"

@@ -32,10 +32,10 @@ git fetch origin "$GIT_BASE_BRANCH" 2>/dev/null || {
 GH_CMD=$(find_gh)
 
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
-  TITLE=$(board_get_card_title "$ISSUE_KEY")
-  DESCRIPTION=$(board_get_card_description "$ISSUE_KEY")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
+  DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   log_step "Implementing: $ISSUE_KEY — $TITLE"
 
@@ -81,6 +81,9 @@ for ISSUE_ID in $ISSUE_IDS; do
   if [[ -f "$REPO_ROOT/.claude/settings.local.json" ]]; then
     mkdir -p "$CARD_WORKTREE/.claude"
     cp "$REPO_ROOT/.claude/settings.local.json" "$CARD_WORKTREE/.claude/settings.local.json"
+  else
+    log_warn "Missing .claude/settings.local.json — Claude Code won't have permissions to write files or run commands."
+    log_warn "Create it with: echo '{\"permissions\":{\"allow\":[\"Bash(*)\",\"Read(*)\",\"Write(*)\",\"Edit(*)\",\"Glob(*)\",\"Grep(*)\"]}}' > .claude/settings.local.json"
   fi
 
   # Install dependencies
