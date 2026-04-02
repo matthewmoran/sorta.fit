@@ -147,7 +147,7 @@ for ISSUE_ID in $ISSUE_IDS; do
     continue
   }
 
-  # Create PR
+  # Prepare PR body
   PR_BODY_FILE=$(mktemp)
   cat > "$PR_BODY_FILE" << PREOF
 ## $ISSUE_KEY: $TITLE
@@ -165,43 +165,65 @@ $IMPLEMENTATION_RESULT
 Automated by Sorta.Fit
 PREOF
 
-  # Retry PR creation — GitHub may not have indexed the pushed ref yet
-  pr_created=false
-  for attempt in 1 2 3; do
-    PR_URL=$("$GH_CMD" pr create \
-      --title "$ISSUE_KEY: $TITLE" \
-      --body-file "$PR_BODY_FILE" \
-      --base "$GIT_BASE_BRANCH" \
-      --head "$BRANCH_NAME" 2>&1) && {
-      pr_created=true
-      break
+  # Check for existing open PR on this branch
+  EXISTING_PR_URL=$("$GH_CMD" pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url' 2>/dev/null || echo "")
+
+  if [[ -n "$EXISTING_PR_URL" && "$EXISTING_PR_URL" != "null" ]]; then
+    # Rework case — update existing PR instead of creating a duplicate
+    PR_URL="$EXISTING_PR_URL"
+    pr_edit_ok=false
+    "$GH_CMD" pr edit "$PR_URL" --body-file "$PR_BODY_FILE" 2>/dev/null && pr_edit_ok=true || {
+      log_warn "Failed to update PR body for $PR_URL"
     }
-    if [[ $attempt -lt 3 ]]; then
-      log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
-      sleep 5
-    fi
-  done
-
-  if [[ "$pr_created" != "true" ]]; then
-    log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
-    board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
-    if [[ -n "$RUNNER_CODE_TO" ]]; then
-      local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
-      if [[ -n "${!local_transition:-}" ]]; then
-        board_transition "$ISSUE_KEY" "${!local_transition}"
-      else
-        log_warn "No transition mapping found for status $RUNNER_CODE_TO. Add $local_transition to your adapter config."
-      fi
-    fi
-    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    "$GH_CMD" pr comment "$PR_URL" --body "Rework pushed by Sorta.Fit — ready for re-review" 2>/dev/null || {
+      log_warn "Failed to post rework comment on $PR_URL"
+    }
     rm -f "$PR_BODY_FILE"
-    continue
+    if [[ "$pr_edit_ok" == true ]]; then
+      log_info "PR updated: $PR_URL"
+      board_add_comment "$ISSUE_KEY" "PR updated: $PR_URL — Rework pushed by Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+    else
+      log_warn "PR body update failed, but rework commits pushed to branch"
+      board_add_comment "$ISSUE_KEY" "Rework pushed to branch (PR body update failed): $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
+    fi
+  else
+    # New PR case — create with retry (GitHub may not have indexed the pushed ref yet)
+    pr_created=false
+    for attempt in 1 2 3; do
+      PR_URL=$("$GH_CMD" pr create \
+        --title "$ISSUE_KEY: $TITLE" \
+        --body-file "$PR_BODY_FILE" \
+        --base "$GIT_BASE_BRANCH" \
+        --head "$BRANCH_NAME" 2>&1) && {
+        pr_created=true
+        break
+      }
+      if [[ $attempt -lt 3 ]]; then
+        log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
+        sleep 5
+      fi
+    done
+
+    if [[ "$pr_created" != "true" ]]; then
+      log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
+      board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
+      if [[ -n "$RUNNER_CODE_TO" ]]; then
+        local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
+        if [[ -n "${!local_transition:-}" ]]; then
+          board_transition "$ISSUE_KEY" "${!local_transition}"
+        else
+          log_warn "No transition mapping found for status $RUNNER_CODE_TO. Add $local_transition to your adapter config."
+        fi
+      fi
+      git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+      rm -f "$PR_BODY_FILE"
+      continue
+    fi
+
+    rm -f "$PR_BODY_FILE"
+    log_info "PR created: $PR_URL"
+    board_add_comment "$ISSUE_KEY" "PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
   fi
-
-  rm -f "$PR_BODY_FILE"
-  log_info "PR created: $PR_URL"
-
-  board_add_comment "$ISSUE_KEY" "PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
 
   if [[ -n "$RUNNER_CODE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
