@@ -1,12 +1,38 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)",
       "Read(*)",
       "Write(*)",
       "Edit(*)",
       "Glob(*)",
-      "Grep(*)"
+      "Grep(*)",
+      "Bash(git status*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git switch*)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(ls*)",
+      "Bash(mkdir*)",
+      "Bash(cp *)",
+      "Bash(cat *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(rm -rf *)",
+      "Bash(rm -r /*)",
+      "Bash(curl*)",
+      "Bash(wget*)",
+      "Bash(chmod*)",
+      "Bash(sudo*)",
+      "Bash(eval*)"
     ]
   }
 }

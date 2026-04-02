@@ -125,22 +125,65 @@ matches_type_filter() {
 # Rate limit detection
 RATE_LIMIT_FILE="${SORTA_ROOT:-.}/.rate-limited"
 
-# Run claude and detect rate limits
+# Run claude with activity logging and rate limit detection
 # Usage: run_claude <prompt_file> <result_file> [working_dir]
 # Returns 0 on success, 1 on failure, 2 on rate limit
 run_claude() {
   local prompt_file="$1"
   local result_file="$2"
-  local work_dir="${3:-$SORTA_ROOT}"
+  local work_dir="${3:-${TARGET_REPO:-$SORTA_ROOT}}"
   local stderr_file
   stderr_file=$(mktemp)
 
-  (cd "$work_dir" && claude -p "$(cat "$prompt_file")" > "$result_file" 2>"$stderr_file") || {
-    local stderr_content
-    stderr_content=$(cat "$stderr_file" 2>/dev/null)
-    rm -f "$stderr_file"
+  local exit_code_file
+  exit_code_file=$(mktemp)
 
-    # Check for rate limit indicators
+  ( cd "$work_dir" && claude -p "$(cat "$prompt_file")" --verbose --output-format stream-json 2>"$stderr_file"; echo $? > "$exit_code_file" ) | \
+    node -e "
+      const fs=require('fs');
+      const rl=require('readline').createInterface({input:process.stdin});
+      let result='';
+      rl.on('line',l=>{
+        try{
+          const e=JSON.parse(l);
+          if(e.type==='assistant'){
+            (e.message?.content||[]).forEach(c=>{
+              if(c.type==='tool_use'){
+                const n=c.name;
+                const inp=c.input||{};
+                let s=inp.file_path||inp.pattern||'';
+                if(n==='Bash')s=(inp.command||'').slice(0,80);
+                if(n==='Edit')s=inp.file_path+(inp.old_string?' (modify)':'');
+                if(n==='Write')s=inp.file_path+' (create)';
+                process.stderr.write('  [CLAUDE] '+n+(s?': '+s:'')+'\n');
+              }
+              if(c.type==='text'&&c.text){
+                const first=c.text.split('\n')[0].trim();
+                if(first)process.stderr.write('  [CLAUDE] '+first.slice(0,120)+'\n');
+              }
+            });
+          }
+          if(e.type==='result')result=e.result||'';
+        }catch(x){}
+      });
+      rl.on('close',()=>{
+        fs.writeFileSync(process.argv[1],result);
+      });
+    " "$result_file"
+
+  local exit_code
+  exit_code=$(cat "$exit_code_file" 2>/dev/null || echo "1")
+  rm -f "$exit_code_file"
+
+  local stderr_content
+  stderr_content=$(cat "$stderr_file" 2>/dev/null)
+  rm -f "$stderr_file"
+
+  if [[ "$exit_code" -ne 0 ]]; then
+    if [[ -n "$stderr_content" ]]; then
+      log_error "Claude stderr: ${stderr_content:0:300}"
+    fi
+
     if echo "$stderr_content" | grep -qiE "rate.limit|too.many.requests|usage.limit|capacity|throttl"; then
       log_warn "Claude rate limit detected. Pausing further runs."
       date +%s > "$RATE_LIMIT_FILE"
@@ -148,9 +191,13 @@ run_claude() {
     fi
 
     return 1
-  }
+  fi
 
-  rm -f "$stderr_file"
+  # Log stderr even on success (warnings, permission issues)
+  if [[ -n "$stderr_content" ]]; then
+    log_warn "Claude stderr: ${stderr_content:0:200}"
+  fi
+
   return 0
 }
 

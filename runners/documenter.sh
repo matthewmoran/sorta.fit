@@ -14,10 +14,10 @@ WORKTREE_DIR="$SORTA_ROOT/.worktrees"
 
 log_info "Documenter: checking $RUNNER_DOCUMENTER_FROM lane..."
 
-REPO_ROOT=$(git rev-parse --show-toplevel)
+REPO_ROOT="$TARGET_REPO"
 
 log_info "Fetching latest $GIT_BASE_BRANCH..."
-git fetch origin "$GIT_BASE_BRANCH" 2>/dev/null || {
+git -C "$REPO_ROOT" fetch origin "$GIT_BASE_BRANCH" 2>/dev/null || {
   log_error "Could not fetch origin/$GIT_BASE_BRANCH"
   exit 1
 }
@@ -43,6 +43,16 @@ for ISSUE_ID in $ISSUE_IDS; do
   DESCRIPTION=$(board_get_card_description "$ISSUE_KEY") || { log_warn "Failed to fetch description for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
+  # Skip if already documented
+  if echo "$COMMENTS" | grep -q "Docs PR opened"; then
+    log_info "$ISSUE_KEY already documented. Skipping."
+    continue
+  fi
+  if echo "$COMMENTS" | grep -q "no documentation changes needed"; then
+    log_info "$ISSUE_KEY already checked — no docs needed. Skipping."
+    continue
+  fi
+
   log_step "Documenting: $ISSUE_KEY — $TITLE"
 
   BRANCH_SLUG=$(slugify "$TITLE")
@@ -61,23 +71,23 @@ for ISSUE_ID in $ISSUE_IDS; do
   # Clean up leftover worktree
   if [[ -d "$CARD_WORKTREE" ]]; then
     log_warn "Cleaning up leftover worktree..."
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || rm -rf "$CARD_WORKTREE" 2>/dev/null || {
+    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || rm -rf "$CARD_WORKTREE" 2>/dev/null || {
       log_warn "Locked worktree for $ISSUE_KEY. Using alternate directory."
       CARD_WORKTREE="${CARD_WORKTREE}-$(date +%s)"
     }
   fi
 
   # Create or reuse branch
-  if git rev-parse --verify "$BRANCH_NAME" >/dev/null 2>&1; then
+  if git -C "$REPO_ROOT" rev-parse --verify "$BRANCH_NAME" >/dev/null 2>&1; then
     log_info "Branch $BRANCH_NAME already exists (retry case)."
   else
     log_info "Creating branch: $BRANCH_NAME from origin/$GIT_BASE_BRANCH"
-    git branch "$BRANCH_NAME" "origin/$GIT_BASE_BRANCH"
+    git -C "$REPO_ROOT" branch "$BRANCH_NAME" "origin/$GIT_BASE_BRANCH"
   fi
 
   # Create worktree
   mkdir -p "$WORKTREE_DIR"
-  git worktree add "$CARD_WORKTREE" "$BRANCH_NAME" 2>/dev/null || {
+  git -C "$REPO_ROOT" worktree add "$CARD_WORKTREE" "$BRANCH_NAME" 2>/dev/null || {
     log_error "Could not create worktree for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: worktree creation failed on $(date '+%Y-%m-%d %H:%M')."
     continue
@@ -89,7 +99,7 @@ for ISSUE_ID in $ISSUE_IDS; do
     cp "$REPO_ROOT/.claude/settings.local.json" "$CARD_WORKTREE/.claude/settings.local.json"
   else
     log_warn "Missing .claude/settings.local.json — Claude Code won't have permissions to write files or run commands."
-    log_warn "Create it with: echo '{\"permissions\":{\"allow\":[\"Bash(*)\",\"Read(*)\",\"Write(*)\",\"Edit(*)\",\"Glob(*)\",\"Grep(*)\"]}}' > .claude/settings.local.json"
+    log_warn "Create it with: cp .claude/settings.local.json.example .claude/settings.local.json"
   fi
 
   # Install dependencies
@@ -114,34 +124,39 @@ for ISSUE_ID in $ISSUE_IDS; do
   RESULT_FILE=$(mktemp)
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
-  log_info "Running Claude Code in worktree..."
-  (cd "$CARD_WORKTREE" && claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>&1) || {
+  log_info "Running Claude Code in worktree ($CARD_WORKTREE)..."
+  log_info "Prompt file: $PROMPT_FILE ($(wc -c < "$PROMPT_FILE") bytes)"
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
+  log_info "Claude exited with code: $claude_rc"
+  if [[ "$claude_rc" -ne 0 ]]; then
+    [[ "$claude_rc" -eq 2 ]] && { git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; }
     log_error "Claude failed for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: documentation generation failed on $(date '+%Y-%m-%d %H:%M'). Manual intervention needed."
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   DOCUMENTATION_RESULT=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"
 
   # Check for commits
-  COMMIT_COUNT=$(git log "origin/$GIT_BASE_BRANCH..$BRANCH_NAME" --oneline 2>/dev/null | wc -l)
+  COMMIT_COUNT=$(git -C "$REPO_ROOT" log "origin/$GIT_BASE_BRANCH..$BRANCH_NAME" --oneline 2>/dev/null | wc -l)
   if [[ "$COMMIT_COUNT" -eq 0 ]]; then
     log_warn "No commits on branch for $ISSUE_KEY — no documentation changes needed."
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: no documentation changes needed on $(date '+%Y-%m-%d %H:%M')."
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     continue
   fi
 
   log_info "$COMMIT_COUNT commit(s) on branch."
 
   # Push branch to remote
-  (cd "$CARD_WORKTREE" && git push -u origin "$BRANCH_NAME" 2>/dev/null) || {
+  git -C "$CARD_WORKTREE" push -u origin "$BRANCH_NAME" 2>/dev/null || {
     log_error "Failed to push branch $BRANCH_NAME for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: push failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     continue
   }
 
@@ -171,9 +186,13 @@ PREOF
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
     if [[ -n "$RUNNER_DOCUMENTER_TO" ]]; then
       local_transition="TRANSITION_TO_${RUNNER_DOCUMENTER_TO}"
-      board_transition "$ISSUE_KEY" "${!local_transition}"
+      if [[ -n "${!local_transition:-}" ]]; then
+        board_transition "$ISSUE_KEY" "${!local_transition}"
+      else
+        log_warn "No transition mapping found for status $RUNNER_DOCUMENTER_TO. Add $local_transition to your adapter config."
+      fi
     fi
-    git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PR_BODY_FILE"
     continue
   }
@@ -185,13 +204,17 @@ PREOF
 
   if [[ -n "$RUNNER_DOCUMENTER_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_DOCUMENTER_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY documented and moved to $RUNNER_DOCUMENTER_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY documented and moved to $RUNNER_DOCUMENTER_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_DOCUMENTER_TO — card documented but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY documented (no transition configured)"
   fi
 
-  git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+  git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 

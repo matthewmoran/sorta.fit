@@ -49,11 +49,14 @@ for ISSUE_ID in $ISSUE_IDS; do
   RESULT_FILE=$(mktemp)
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
-  (claude -p "$(cat "$PROMPT_FILE")" > "$RESULT_FILE" 2>/dev/null) || {
+  claude_rc=0
+  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY"
     rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
-  }
+  fi
 
   TRIAGE=$(cat "$RESULT_FILE")
   rm -f "$PROMPT_FILE" "$RESULT_FILE"
@@ -75,8 +78,12 @@ $TRIAGE"
 
   if [[ -n "$RUNNER_TRIAGE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_TRIAGE_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY triaged and moved to $RUNNER_TRIAGE_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY triaged and moved to $RUNNER_TRIAGE_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_TRIAGE_TO — card triaged but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY triaged (no transition configured)"
   fi

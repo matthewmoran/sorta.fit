@@ -26,6 +26,12 @@ CRITICAL SAFETY RULES:
 - ONLY commit and push to the feature branch: {{BRANCH_NAME}}
 - If anything goes wrong, stop immediately
 
+SENSITIVE DATA RULES:
+- NEVER hardcode API keys, tokens, passwords, secrets, or credentials in source code
+- NEVER read or log the contents of .env or any file containing secrets
+- Use environment variables or config references — never embed actual values
+- If tests need credentials, use clearly fake placeholders like `test-token-do-not-use`
+
 CRITICAL CODE RULES:
 - Follow the existing architecture and patterns in the codebase
 - Use the project's logging conventions, not console methods

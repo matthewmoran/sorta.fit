@@ -493,6 +493,13 @@ BOARD_PROJECT_KEY=${q(e.BOARD_PROJECT_KEY || '')}
 BOARD_EMAIL=${q(e.BOARD_EMAIL || '')}
 
 # =============================================================================
+# Target Repository
+# =============================================================================
+
+# Absolute path to the repository sorta.fit operates on
+${e.TARGET_REPO ? 'TARGET_REPO=' + q(e.TARGET_REPO) : '# TARGET_REPO='}
+
+# =============================================================================
 # Git
 # =============================================================================
 
@@ -545,6 +552,9 @@ RUNNER_BOUNCE_TO=${e.RUNNER_BOUNCE_TO || ''}
 
 RUNNER_MERGE_FROM=${e.RUNNER_MERGE_FROM || ''}
 RUNNER_MERGE_TO=${e.RUNNER_MERGE_TO || ''}
+
+RUNNER_DOCUMENTER_FROM=${e.RUNNER_DOCUMENTER_FROM || ''}
+RUNNER_DOCUMENTER_TO=${e.RUNNER_DOCUMENTER_TO || ''}
 
 MAX_BOUNCES=${e.MAX_BOUNCES || '3'}
 `;
@@ -701,6 +711,24 @@ async function handleRunnerStatus(req, res) {
   sendJSON(res, 200, { running, pid: runnerPID });
 }
 
+async function handleLogs(req, res) {
+  const logPath = path.join(PROJECT_ROOT, 'runner.log');
+
+  if (!fs.existsSync(logPath)) {
+    return sendJSON(res, 200, { success: true, logs: '', empty: true });
+  }
+
+  try {
+    const content = fs.readFileSync(logPath, 'utf8');
+    const lines = content.split('\n');
+    const tail = lines.slice(-200).join('\n');
+    const stripped = tail.replace(/\x1b\[[0-9;]*m/g, '');
+    sendJSON(res, 200, { success: true, logs: stripped, empty: false });
+  } catch (err) {
+    sendJSON(res, 500, { success: false, message: `Failed to read logs: ${err.message}` });
+  }
+}
+
 // ─── Route table ────────────────────────────────────────────────────
 
 const API_ROUTES = {
@@ -712,6 +740,7 @@ const API_ROUTES = {
   '/api/start-runner':       handleStartRunner,
   '/api/stop-runner':        handleStopRunner,
   '/api/runner-status':      handleRunnerStatus,
+  '/api/logs':               handleLogs,
 };
 
 // ─── Static file server ─────────────────────────────────────────────

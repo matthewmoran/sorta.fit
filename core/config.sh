@@ -36,6 +36,34 @@ fi
 : "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"
 
+# TARGET_REPO — the repository sorta.fit operates on
+if [[ -n "${TARGET_REPO:-}" ]]; then
+  # Reject relative paths
+  if [[ "$TARGET_REPO" != /* ]]; then
+    echo "ERROR: TARGET_REPO must be an absolute path (got: $TARGET_REPO)"
+    exit 1
+  fi
+  if [[ ! -d "$TARGET_REPO" ]]; then
+    echo "ERROR: TARGET_REPO does not exist: $TARGET_REPO"
+    exit 1
+  fi
+  if ! git -C "$TARGET_REPO" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "ERROR: TARGET_REPO is not a git repository: $TARGET_REPO"
+    exit 1
+  fi
+  export TARGET_REPO
+else
+  # Fallback: infer from current working directory
+  if TARGET_REPO=$(git rev-parse --show-toplevel 2>/dev/null); then
+    export TARGET_REPO
+    source "$SORTA_ROOT/core/utils.sh" 2>/dev/null || true
+    log_warn "TARGET_REPO is not set. Falling back to git repo at $TARGET_REPO. Set TARGET_REPO in .env to silence this warning." 2>/dev/null || true
+  else
+    echo "ERROR: TARGET_REPO is not set and current directory is not inside a git repository."
+    exit 1
+  fi
+fi
+
 # Optional with defaults
 export GIT_BASE_BRANCH="${GIT_BASE_BRANCH:-main}"
 export POLL_INTERVAL="${POLL_INTERVAL:-3600}"

@@ -58,9 +58,9 @@ All bash scripts must follow these conventions:
 
 4. Create a corresponding prompt template at `prompts/{name}.md` using `{{PLACEHOLDER}}` syntax for variable substitution.
 
-5. Add your recipe name to the `RECIPES_ENABLED` list in `.env` to include it in the polling loop, or document it as a standalone/manual recipe.
+5. Add your runner name to the `RUNNERS_ENABLED` list in `.env` to include it in the polling loop, or document it as a standalone/manual runner.
 
-6. Document the recipe in `docs/recipes.md` following the format used for existing recipes.
+6. Document the runner in `docs/runners.md` following the format used for existing runners.
 
 For a comprehensive guide covering the runner anatomy, prompt templates, .env configuration, and the board adapter interface, see [Writing New Runners](writing-runners.md).
 

@@ -343,7 +343,7 @@ Use this checklist when creating a runner named `{name}`:
 | 3 | Add default variables (`RUNNER_{NAME}_FROM`, `RUNNER_{NAME}_TO`, `MAX_CARDS_{NAME}`) | `core/config.sh` |
 | 4 | Add runner configuration values (status IDs, card limits) | `.env` |
 | 5 | Add the runner name to `RUNNERS_ENABLED` | `.env` |
-| 6 | Document the runner (lane flow, config, placeholders) | `docs/recipes.md` |
+| 6 | Document the runner (lane flow, config, placeholders) | `docs/runners.md` |
 
 ### Verification
 

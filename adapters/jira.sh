@@ -38,6 +38,10 @@ board_get_cards_in_status() {
   local status="$1"
   local max="${2:-10}"
   local start_at="${3:-0}"
+  if [[ -z "$status" ]]; then
+    log_error "No status ID configured for this runner. Check RUNNER_*_FROM in .env."
+    return 1
+  fi
   local response
   response=$(jira_curl -X POST \
     -H "$JIRA_AUTH_HEADER" \
@@ -105,8 +109,17 @@ board_get_card_description() {
         function extractText(node){
           if(!node)return '';
           if(node.type==='text')return node.text||'';
-          if(node.content)return node.content.map(extractText).join(node.type==='paragraph'?'\n':'');
-          return '';
+          if(node.type==='hardBreak')return '\n';
+          if(!node.content)return '';
+          if(node.type==='doc')return node.content.map(extractText).join('\n\n');
+          if(node.type==='heading'){
+            var lvl=(node.attrs&&node.attrs.level)||2;
+            var p='';for(var i=0;i<lvl;i++)p+='#';
+            return p+' '+node.content.map(extractText).join('');
+          }
+          if(node.type==='bulletList'||node.type==='orderedList')return node.content.map(extractText).join('\n');
+          if(node.type==='listItem')return '- '+node.content.map(extractText).join('\n');
+          return node.content.map(extractText).join('');
         }
         console.log(extractText(desc));
       });"
@@ -127,8 +140,17 @@ board_get_card_comments() {
           function extractText(node){
             if(!node)return '';
             if(node.type==='text')return node.text||'';
-            if(node.content)return node.content.map(extractText).join(node.type==='paragraph'?'\n':'');
-            return '';
+            if(node.type==='hardBreak')return '\n';
+            if(!node.content)return '';
+            if(node.type==='doc')return node.content.map(extractText).join('\n\n');
+            if(node.type==='heading'){
+              var lvl=(node.attrs&&node.attrs.level)||2;
+              var p='';for(var i=0;i<lvl;i++)p+='#';
+              return p+' '+node.content.map(extractText).join('');
+            }
+            if(node.type==='bulletList'||node.type==='orderedList')return node.content.map(extractText).join('\n');
+            if(node.type==='listItem')return '- '+node.content.map(extractText).join('\n');
+            return node.content.map(extractText).join('');
           }
           console.log('---');
           console.log('Author:',c.author.displayName);
@@ -192,7 +214,7 @@ board_update_description() {
     fs.writeFileSync(process.argv[2], JSON.stringify({ fields: { description: { type: 'doc', version: 1, content } } }));
   " "$tmpfile" "$payload_file"
 
-  jira_curl -X PUT -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key"
+  jira_curl -X PUT -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key" > /dev/null
   rm -f "$tmpfile" "$payload_file"
 }
 
@@ -210,7 +232,7 @@ board_add_comment() {
     }));
   " "$comment" "$payload_file"
 
-  jira_curl -X POST -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key/comment"
+  jira_curl -X POST -H "$JIRA_AUTH_HEADER" -H "Content-Type: application/json" -d @"$payload_file" "$JIRA_BASE/issue/$issue_key/comment" > /dev/null
   rm -f "$payload_file"
 }
 
@@ -221,7 +243,7 @@ board_transition() {
     -H "$JIRA_AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "{\"transition\":{\"id\":\"$transition_id\"}}" \
-    "$JIRA_BASE/issue/$issue_key/transitions"
+    "$JIRA_BASE/issue/$issue_key/transitions" > /dev/null
 }
 
 board_discover() {

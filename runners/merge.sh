@@ -81,8 +81,12 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   if [[ -n "$RUNNER_MERGE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_MERGE_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY merged and moved to $RUNNER_MERGE_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY merged and moved to $RUNNER_MERGE_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_MERGE_TO — card merged but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY merged (no transition configured)"
   fi

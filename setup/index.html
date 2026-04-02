@@ -580,6 +580,71 @@ select option:disabled {
     min-width: 30px;
   }
 }
+
+/* Log viewer modal */
+.log-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.log-overlay.visible {
+  display: flex;
+}
+.log-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease;
+}
+.log-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.log-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.log-modal-header .log-actions {
+  display: flex;
+  gap: 8px;
+}
+.log-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  min-height: 200px;
+}
+.log-modal-body pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+.log-modal-body .log-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 40px 0;
+}
 </style>
 </head>
 <body>
@@ -590,6 +655,21 @@ select option:disabled {
   </div>
   <div class="step-indicator" id="stepIndicator"></div>
   <div class="card" id="wizardCard"></div>
+</div>
+
+<div class="log-overlay" id="logOverlay">
+  <div class="log-modal">
+    <div class="log-modal-header">
+      <h3>Runner Logs</h3>
+      <div class="log-actions">
+        <button class="btn btn-secondary" onclick="window._wizRefreshLogs()" style="padding:6px 12px;font-size:13px">Refresh</button>
+        <button class="btn btn-secondary" onclick="window._wizCloseLogs()" style="padding:6px 12px;font-size:13px">Close</button>
+      </div>
+    </div>
+    <div class="log-modal-body" id="logContent">
+      <div class="log-empty">Loading...</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -614,6 +694,7 @@ select option:disabled {
     { id: "review", name: "Review", desc: "Review PR diffs and post structured feedback on GitHub." },
     { id: "triage", name: "Triage", desc: "Analyze bug reports, identify root causes, write triage reports." },
     { id: "bounce", name: "Bounce", desc: "Move cards with rejected PR reviews back for automated rework." },
+    { id: "merge", name: "Merge", desc: "Merge approved PRs and transition cards to Done." },
     { id: "documenter", name: "Documenter", desc: "Generate and maintain project docs from card specs." }
   ];
 
@@ -630,6 +711,7 @@ select option:disabled {
       email: "",
       apiToken: "",
       projectKey: "",
+      targetRepo: "",
       baseBranch: "main",
       pollInterval: 60,
       recipes: ["refine", "code"],
@@ -1228,6 +1310,9 @@ select option:disabled {
       showMsg("configMsg", "error", "Could not auto-match all lanes. Your board may use different status names. Configure manually below.");
       return;
     }
+    if (!doneId) {
+      showMsg("configMsg", "error", "Could not find a 'Done' status. Documenter and merge lanes need to be configured manually below.");
+    }
 
     if (mode === "human-gates") {
       // Human gates: Refined->Agent is manual, QA->Done is manual
@@ -1281,6 +1366,11 @@ select option:disabled {
     var c = state.config;
     var html = '<h2>Git Settings</h2>' +
       '<p>Configure version control and polling parameters.</p>' +
+      '<div class="form-group">' +
+        '<label for="targetRepo">Target Repository</label>' +
+        '<span class="hint">Absolute path to the project repo sorta.fit will operate on (leave blank to use current directory)</span>' +
+        '<input type="text" id="targetRepo" value="' + escHtml(c.targetRepo) + '" placeholder="/absolute/path/to/your/project" onchange="window._wizGitField(\'targetRepo\', this.value)" />' +
+      '</div>' +
       '<div class="form-group">' +
         '<label for="baseBranch">Base Branch</label>' +
         '<span class="hint">Feature branches will be created from this branch</span>' +
@@ -1340,6 +1430,7 @@ select option:disabled {
     html += '<div class="summary-section">' +
       '<h3>Git Settings</h3>' +
       '<table class="summary-table">' +
+        '<tr><td>Target Repository</td><td>' + (c.targetRepo ? escHtml(c.targetRepo) : '(current directory)') + '</td></tr>' +
         '<tr><td>Base Branch</td><td>' + escHtml(c.baseBranch) + '</td></tr>' +
         '<tr><td>Poll Interval</td><td>' + c.pollInterval + ' minutes</td></tr>' +
       '</table></div>';
@@ -1384,6 +1475,7 @@ select option:disabled {
         BOARD_API_TOKEN: c.apiToken,
         BOARD_PROJECT_KEY: c.projectKey,
         BOARD_EMAIL: c.email,
+        TARGET_REPO: c.targetRepo || "",
         GIT_BASE_BRANCH: c.baseBranch,
         POLL_INTERVAL: String((c.pollInterval || 60) * 60),
         RUNNERS_ENABLED: (c.recipes || []).join(",")
@@ -1456,6 +1548,7 @@ select option:disabled {
     }
 
     html += '<button class="btn btn-secondary" onclick="window._wizCheckStatus()">Refresh Status</button>' +
+      '<button class="btn btn-secondary" onclick="window._wizViewLogs()">View Logs</button>' +
       '</div>' +
       '<div id="runnerMsg" class="msg"></div>';
 
@@ -1564,6 +1657,40 @@ select option:disabled {
     }
   };
 
+  window._wizViewLogs = function() {
+    document.getElementById("logOverlay").classList.add("visible");
+    window._wizRefreshLogs();
+  };
+
+  window._wizCloseLogs = function() {
+    document.getElementById("logOverlay").classList.remove("visible");
+  };
+
+  window._wizRefreshLogs = async function() {
+    var container = document.getElementById("logContent");
+    container.innerHTML = '<div class="log-empty">Loading...</div>';
+    try {
+      var data = await apiPost("/api/logs");
+      if (data.empty || !data.logs) {
+        container.innerHTML = '<div class="log-empty">No logs yet. Start the runner to generate logs.</div>';
+      } else {
+        var pre = document.createElement("pre");
+        pre.textContent = data.logs;
+        container.innerHTML = "";
+        container.appendChild(pre);
+        container.scrollTop = container.scrollHeight;
+      }
+    } catch(e) {
+      container.innerHTML = '<div class="log-empty">Failed to load logs: ' + escHtml(e.message) + '</div>';
+    }
+  };
+
+  document.getElementById("logOverlay").addEventListener("click", function(e) {
+    if (e.target === this) {
+      window._wizCloseLogs();
+    }
+  });
+
   function startStatusPolling() {
     stopStatusPolling();
     state.runner.pollTimer = setInterval(async function() {
@@ -1648,6 +1775,7 @@ select option:disabled {
         state.config.email = env.BOARD_EMAIL || "";
         state.config.apiToken = env.BOARD_API_TOKEN || "";
         state.config.projectKey = env.BOARD_PROJECT_KEY || "";
+        state.config.targetRepo = env.TARGET_REPO || "";
         state.config.baseBranch = env.GIT_BASE_BRANCH || "main";
         state.config.pollInterval = env.POLL_INTERVAL ? Math.round(parseInt(env.POLL_INTERVAL) / 60) : 60;
 
