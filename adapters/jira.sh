@@ -25,6 +25,8 @@ jira_curl() {
     log_error "Jira API error (HTTP $http_code)"
     if [[ "${body:0:1}" == "<" ]]; then
       log_error "Received HTML instead of JSON — check BOARD_DOMAIN, BOARD_EMAIL, and BOARD_API_TOKEN in .env"
+    else
+      log_error "Response: ${body:0:200}"
     fi
     return 1
   fi
@@ -35,12 +37,13 @@ jira_curl() {
 board_get_cards_in_status() {
   local status="$1"
   local max="${2:-10}"
+  local start_at="${3:-0}"
   local response
   response=$(jira_curl -X POST \
     -H "$JIRA_AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "{\"jql\":\"project=$BOARD_PROJECT_KEY AND status=$status ORDER BY rank ASC\",\"maxResults\":$max}" \
-    "$JIRA_BASE/search/jql") || return 1
+    "$JIRA_BASE/search/jql?startAt=$start_at") || return 1
   echo "$response" | \
     node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.issues)j.issues.forEach(i=>console.log(i.id));})"
 }

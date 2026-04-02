@@ -14,13 +14,6 @@ WORKTREE_DIR="$SORTA_ROOT/.worktrees"
 
 log_info "Coder: checking $RUNNER_CODE_FROM lane..."
 
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_CODE_FROM" "$MAX_CARDS_CODE")
-
-if [[ -z "$ISSUE_IDS" ]]; then
-  log_info "No cards in $RUNNER_CODE_FROM. Nothing to code."
-  exit 0
-fi
-
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
 log_info "Fetching latest $GIT_BASE_BRANCH..."
@@ -30,6 +23,19 @@ git fetch origin "$GIT_BASE_BRANCH" 2>/dev/null || {
 }
 
 GH_CMD=$(find_gh)
+
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_CODE_FROM" "$MAX_CARDS_CODE" "$START_AT")
+
+if [[ -z "$ISSUE_IDS" ]]; then
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_CODE_FROM. Nothing to code."
+  break
+fi
+
+BATCH_PROCESSED=0
 
 for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
@@ -185,6 +191,17 @@ PREOF
   fi
 
   git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_CODE))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done
 
 rmdir "$WORKTREE_DIR" 2>/dev/null || true

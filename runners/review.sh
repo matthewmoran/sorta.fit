@@ -11,14 +11,20 @@ source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
 
 log_info "Reviewer: checking $RUNNER_REVIEW_FROM lane..."
 
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REVIEW_FROM" "$MAX_CARDS_REVIEW")
+GH_CMD=$(find_gh)
+
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REVIEW_FROM" "$MAX_CARDS_REVIEW" "$START_AT")
 
 if [[ -z "$ISSUE_IDS" ]]; then
-  log_info "No cards in $RUNNER_REVIEW_FROM. Nothing to review."
-  exit 0
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_REVIEW_FROM. Nothing to review."
+  break
 fi
 
-GH_CMD=$(find_gh)
+BATCH_PROCESSED=0
 
 for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
@@ -128,4 +134,15 @@ $REVIEW"
   else
     log_info "Review complete for $ISSUE_KEY. Card stays in $RUNNER_REVIEW_FROM."
   fi
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_REVIEW))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done

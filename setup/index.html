@@ -640,6 +640,7 @@ select option:disabled {
         review:  { fromId: "", toId: "", maxCards: 10 },
         triage:  { fromId: "", toId: "", maxCards: 5 },
         bounce:  { fromId: "", toId: "", maxCards: 10 },
+        merge:   { fromId: "", toId: "", maxCards: 10 },
         documenter: { fromId: "", toId: "", maxCards: 5 }
       }
     },
@@ -1235,6 +1236,7 @@ select option:disabled {
       state.config.routing.review = { fromId: qaId, toId: "", maxCards: 10 };
       state.config.routing.triage = { fromId: todoId, toId: refinedId, maxCards: 5 };
       state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.merge = { fromId: "", toId: "", maxCards: 10 };
       state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
       renderCard();
       showMsg("configMsg", "success", "Human gates setup applied. You review specs before implementation and PRs before merge.");
@@ -1242,12 +1244,13 @@ select option:disabled {
       // Fully autonomous: everything automated end-to-end
       state.config.routing.refine = { fromId: todoId, toId: agentId, maxCards: 5 };
       state.config.routing.code = { fromId: agentId, toId: qaId, maxCards: 2 };
-      state.config.routing.review = { fromId: qaId, toId: doneId || "", maxCards: 10 };
+      state.config.routing.review = { fromId: qaId, toId: "", maxCards: 10 };
       state.config.routing.triage = { fromId: todoId, toId: agentId, maxCards: 5 };
       state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.merge = { fromId: qaId, toId: doneId || "", maxCards: 10 };
       state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
       renderCard();
-      showMsg("configMsg", "info", "Fully autonomous setup applied. Note: auto-merge is not yet implemented -- PR merge to Done still requires a human step.");
+      showMsg("configMsg", "info", "Fully autonomous setup applied. The merge runner closes the loop by merging approved PRs.");
     }
   }
 
@@ -1391,7 +1394,7 @@ select option:disabled {
       for (var i = 0; i < recipeIds.length; i++) {
         var rid = recipeIds[i];
         var upper = rid.toUpperCase();
-        var route = c.routing[rid];
+        var route = c.routing[rid] || {};
         env["RUNNER_" + upper + "_FROM"] = route.fromId || "";
         env["RUNNER_" + upper + "_TO"] = route.toId || "";
         env["MAX_CARDS_" + upper] = String(route.maxCards || 5);
@@ -1659,6 +1662,7 @@ select option:disabled {
           var fromKey = "RUNNER_" + upper + "_FROM";
           var toKey = "RUNNER_" + upper + "_TO";
           var maxKey = "MAX_CARDS_" + upper;
+          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5 };
           if (env[fromKey]) state.config.routing[rid].fromId = env[fromKey];
           if (env[toKey]) state.config.routing[rid].toId = env[toKey];
           if (env[maxKey]) state.config.routing[rid].maxCards = parseInt(env[maxKey]) || state.config.routing[rid].maxCards;

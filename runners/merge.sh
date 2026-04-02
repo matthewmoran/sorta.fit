@@ -22,12 +22,18 @@ esac
 
 log_info "Merge: checking $RUNNER_MERGE_FROM lane for approved PRs..."
 
-ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_MERGE_FROM" "$MAX_CARDS_MERGE")
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_MERGE_FROM" "$MAX_CARDS_MERGE" "$START_AT")
 
 if [[ -z "$ISSUE_IDS" ]]; then
-  log_info "No cards in $RUNNER_MERGE_FROM. Nothing to merge."
-  exit 0
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_MERGE_FROM. Nothing to merge."
+  break
 fi
+
+BATCH_PROCESSED=0
 
 for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
@@ -100,4 +106,15 @@ for ISSUE_ID in $ISSUE_IDS; do
       fi
     fi
   fi
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_MERGE))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
 done
