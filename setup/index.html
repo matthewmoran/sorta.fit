@@ -714,16 +714,17 @@ select option:disabled {
       targetRepo: "",
       baseBranch: "main",
       pollInterval: 60,
+      claudeAgent: "",
       recipes: ["refine", "code"],
       routing: {
-        refine:    { fromId: "", toId: "", maxCards: 5 },
-        architect: { fromId: "", toId: "", maxCards: 5 },
-        code:      { fromId: "", toId: "", maxCards: 2 },
-        review:  { fromId: "", toId: "", maxCards: 10 },
-        triage:  { fromId: "", toId: "", maxCards: 5 },
-        bounce:  { fromId: "", toId: "", maxCards: 10 },
-        merge:   { fromId: "", toId: "", maxCards: 10 },
-        documenter: { fromId: "", toId: "", maxCards: 5 }
+        refine:    { fromId: "", toId: "", maxCards: 5, agent: "" },
+        architect: { fromId: "", toId: "", maxCards: 5, agent: "" },
+        code:      { fromId: "", toId: "", maxCards: 2, agent: "" },
+        review:  { fromId: "", toId: "", maxCards: 10, agent: "" },
+        triage:  { fromId: "", toId: "", maxCards: 5, agent: "" },
+        bounce:  { fromId: "", toId: "", maxCards: 10, agent: "" },
+        merge:   { fromId: "", toId: "", maxCards: 10, agent: "" },
+        documenter: { fromId: "", toId: "", maxCards: 5, agent: "" }
       }
     },
     runner: {
@@ -1281,6 +1282,12 @@ select option:disabled {
             '<input type="number" value="' + (route.maxCards || 5) + '" min="1" style="font-size:13px" ' +
               'onchange="window._wizRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
           '</div>' +
+          (r.id !== "bounce" && r.id !== "merge" ?
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Claude Agent</label>' +
+            '<input type="text" value="' + escHtml(route.agent || '') + '" placeholder="(optional)" style="font-size:13px" ' +
+              'onchange="window._wizRouteField(\'' + r.id + '\',\'agent\',this.value)" />' +
+          '</div>' : '') +
         '</div>' +
       '</div>';
     }
@@ -1381,6 +1388,11 @@ select option:disabled {
         '<span class="hint">How often the runner checks for new cards</span>' +
         '<input type="number" id="pollInterval" value="' + c.pollInterval + '" min="1" onchange="window._wizGitField(\'pollInterval\', parseInt(this.value) || 60)" />' +
       '</div>' +
+      '<div class="form-group">' +
+        '<label for="claudeAgent">Default Claude Agent</label>' +
+        '<span class="hint">Pre-configured Claude Code agent name for all runners (leave blank for CLI default). Per-runner overrides can be set in the Configure step.</span>' +
+        '<input type="text" id="claudeAgent" value="' + escHtml(c.claudeAgent || '') + '" placeholder="(optional)" onchange="window._wizGitField(\'claudeAgent\', this.value)" />' +
+      '</div>' +
       '<div class="btn-row">' +
         backBtn() +
         '<div class="btn-row-right">' +
@@ -1433,6 +1445,7 @@ select option:disabled {
         '<tr><td>Target Repository</td><td>' + (c.targetRepo ? escHtml(c.targetRepo) : '(current directory)') + '</td></tr>' +
         '<tr><td>Base Branch</td><td>' + escHtml(c.baseBranch) + '</td></tr>' +
         '<tr><td>Poll Interval</td><td>' + c.pollInterval + ' minutes</td></tr>' +
+        (c.claudeAgent ? '<tr><td>Default Claude Agent</td><td>' + escHtml(c.claudeAgent) + '</td></tr>' : '') +
       '</table></div>';
 
     // Recipes & routing
@@ -1444,9 +1457,10 @@ select option:disabled {
       var route = (c.routing || {})[rid] || {};
       var fromName = statusName(route.fromId);
       var toName = route.toId ? statusName(route.toId) : "(stays)";
+      var agentInfo = route.agent ? ' &mdash; agent: ' + escHtml(route.agent) : '';
       html += '<tr><td>' + escHtml(rid) + '</td><td>' +
         escHtml(fromName) + ' &rarr; ' + escHtml(toName) +
-        ' &nbsp; (max: ' + (route.maxCards || '?') + ')' +
+        ' &nbsp; (max: ' + (route.maxCards || '?') + ')' + agentInfo +
         '</td></tr>';
     }
     html += '</table></div>';
@@ -1481,7 +1495,10 @@ select option:disabled {
         RUNNERS_ENABLED: (c.recipes || []).join(",")
       };
 
-      // Add per-recipe routing and max cards
+      // Global Claude agent
+      env["CLAUDE_AGENT"] = c.claudeAgent || "";
+
+      // Add per-recipe routing, max cards, and agent
       var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
       for (var i = 0; i < recipeIds.length; i++) {
         var rid = recipeIds[i];
@@ -1490,6 +1507,7 @@ select option:disabled {
         env["RUNNER_" + upper + "_FROM"] = route.fromId || "";
         env["RUNNER_" + upper + "_TO"] = route.toId || "";
         env["MAX_CARDS_" + upper] = String(route.maxCards || 5);
+        env["RUNNER_" + upper + "_AGENT"] = route.agent || "";
       }
 
       // Build adapter config
@@ -1783,6 +1801,8 @@ select option:disabled {
           state.config.recipes = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
         }
 
+        state.config.claudeAgent = env.CLAUDE_AGENT || "";
+
         var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
         for (var i = 0; i < recipeIds.length; i++) {
           var rid = recipeIds[i];
@@ -1790,10 +1810,12 @@ select option:disabled {
           var fromKey = "RUNNER_" + upper + "_FROM";
           var toKey = "RUNNER_" + upper + "_TO";
           var maxKey = "MAX_CARDS_" + upper;
-          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5 };
+          var agentKey = "RUNNER_" + upper + "_AGENT";
+          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5, agent: "" };
           if (env[fromKey]) state.config.routing[rid].fromId = env[fromKey];
           if (env[toKey]) state.config.routing[rid].toId = env[toKey];
           if (env[maxKey]) state.config.routing[rid].maxCards = parseInt(env[maxKey]) || state.config.routing[rid].maxCards;
+          if (env[agentKey]) state.config.routing[rid].agent = env[agentKey];
         }
 
         if (data.statuses && data.statuses.length > 0) {

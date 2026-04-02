@@ -45,7 +45,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   claude_rc=0
-  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" "" "${RUNNER_ARCHITECT_AGENT:-$CLAUDE_AGENT}" || claude_rc=$?
   if [[ "$claude_rc" -eq 2 ]]; then break; fi
   if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY, skipping"

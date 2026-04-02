@@ -126,19 +126,22 @@ matches_type_filter() {
 RATE_LIMIT_FILE="${SORTA_ROOT:-.}/.rate-limited"
 
 # Run claude with activity logging and rate limit detection
-# Usage: run_claude <prompt_file> <result_file> [working_dir]
+# Usage: run_claude <prompt_file> <result_file> [working_dir] [agent]
 # Returns 0 on success, 1 on failure, 2 on rate limit
 run_claude() {
   local prompt_file="$1"
   local result_file="$2"
   local work_dir="${3:-${TARGET_REPO:-$SORTA_ROOT}}"
+  local agent="${4:-}"
+  local agent_flag=""
+  [[ -n "$agent" ]] && agent_flag="--agent $agent"
   local stderr_file
   stderr_file=$(mktemp)
 
   local exit_code_file
   exit_code_file=$(mktemp)
 
-  ( cd "$work_dir" && claude -p "$(cat "$prompt_file")" --verbose --output-format stream-json 2>"$stderr_file"; echo $? > "$exit_code_file" ) | \
+  ( cd "$work_dir" && claude -p "$(cat "$prompt_file")" --verbose --output-format stream-json $agent_flag 2>"$stderr_file"; echo $? > "$exit_code_file" ) | \
     node -e "
       const fs=require('fs');
       const rl=require('readline').createInterface({input:process.stdin});
