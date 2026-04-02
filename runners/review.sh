@@ -21,8 +21,8 @@ fi
 GH_CMD=$(find_gh)
 
 for ISSUE_ID in $ISSUE_IDS; do
-  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID")
-  COMMENTS=$(board_get_card_comments "$ISSUE_KEY")
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
   # Find PR URL in comments
   PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
@@ -103,7 +103,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$REVIEW" > "$REVIEW_BODY_FILE"
 
   "$GH_CMD" pr review "$PR_URL" --"$REVIEW_EVENT" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || {
-    log_warn "PR review failed. Falling back to comment."
+    log_info "Posting as comment (can't review your own PR)."
     "$GH_CMD" pr comment "$PR_URL" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || \
       log_error "Could not post review to $PR_URL"
   }

@@ -26,6 +26,12 @@ case "$BOARD_ADAPTER" in
   jira|linear|github-issues) ;;
   *) echo "ERROR: Unknown adapter: $BOARD_ADAPTER"; exit 1 ;;
 esac
+
+# Validate board domain (prevent injection into URLs)
+if [[ ! "$BOARD_DOMAIN" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+[a-zA-Z0-9]$ ]]; then
+  echo "ERROR: Invalid BOARD_DOMAIN: $BOARD_DOMAIN"
+  exit 1
+fi
 : "${BOARD_DOMAIN:?BOARD_DOMAIN not set}"
 : "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"
