@@ -81,6 +81,9 @@ for ISSUE_ID in $ISSUE_IDS; do
   if [[ -f "$REPO_ROOT/.claude/settings.local.json" ]]; then
     mkdir -p "$CARD_WORKTREE/.claude"
     cp "$REPO_ROOT/.claude/settings.local.json" "$CARD_WORKTREE/.claude/settings.local.json"
+  else
+    log_warn "Missing .claude/settings.local.json — Claude Code won't have permissions to write files or run commands."
+    log_warn "Create it with: echo '{\"permissions\":{\"allow\":[\"Bash(*)\",\"Read(*)\",\"Write(*)\",\"Edit(*)\",\"Glob(*)\",\"Grep(*)\"]}}' > .claude/settings.local.json"
   fi
 
   # Install dependencies
