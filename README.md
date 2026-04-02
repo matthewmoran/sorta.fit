@@ -5,7 +5,7 @@ Autonomous sprint execution powered by Claude Code. Sorta.Fit connects your issu
 It runs in the background on your computer -- as long as it's on, your board keeps moving. Configure human review gates where you need them, or let it handle everything.
 
 ```
-     [To Do] --refine--> [Refined] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
+     [To Do] --refine--> [Refined] --architect--> [Architected] --you--> [Agent] --code--> [QA] --review--> [QA] --you--> [Done]
 ```
 
 ## Why Sorta.Fit
@@ -88,6 +88,7 @@ For a complete reference of every configuration variable, see the [Setup Guide](
 | Runner | What It Does | Default Flow |
 |--------|-------------|-------------|
 | `refine` | Generates structured spec from card | To Do --> Refined |
+| `architect` | Analyzes codebase, enriches spec with implementation plan | Refined --> Architected |
 | `code` | Implements card, creates branch and PR | Agent --> QA |
 | `review` | Reviews PR diff, posts GitHub review | QA --> QA (stays) |
 | `triage` | Analyzes bug report, writes triage to card | To Do --> Refined |
@@ -113,7 +114,7 @@ You review specs before implementation starts, and review PRs before merging. Th
 Everything automated end-to-end. Auto-merge is not yet implemented -- PR merge to Done still requires a human step.
 
 ```
-[To Do] --refine--> [Agent] --code--> [QA] --review--> [Done]
+[To Do] --refine--> [Refined] --architect--> [Agent] --code--> [QA] --review--> [Done]
 ```
 
 ## Supported Boards
