@@ -4,7 +4,8 @@ adapters/*.config.sh
 .automation.lock
 .rate-limited
 .worktrees/
-.claude/
+.claude/*
+!.claude/settings.local.json.example
 dist/
 *.log
 runner.log
