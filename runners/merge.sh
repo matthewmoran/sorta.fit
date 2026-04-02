@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 GH_CMD=$(find_gh)
 
@@ -40,8 +41,8 @@ for ISSUE_ID in $ISSUE_IDS; do
   TITLE=$(board_get_card_title "$ISSUE_KEY") || { log_warn "Failed to fetch title for $ISSUE_KEY. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  # Find PR URL in comments
-  PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
+  # Find most recent PR URL in comments
+  PR_URL=$(extract_pr_url "$COMMENTS")
 
   if [[ -z "$PR_URL" ]]; then
     log_info "$ISSUE_KEY: no PR URL in comments. Skipping."
@@ -49,22 +50,7 @@ for ISSUE_ID in $ISSUE_IDS; do
   fi
 
   # Check PR review decision
-  PR_STATE=$("$GH_CMD" pr view "$PR_URL" --json reviewDecision --jq '.reviewDecision' 2>/dev/null || echo "")
-
-  APPROVED=false
-  if [[ "$PR_STATE" == "APPROVED" ]]; then
-    APPROVED=true
-  fi
-
-  # If gh doesn't return reviewDecision, check reviews directly
-  if [[ -z "$PR_STATE" || "$PR_STATE" == "null" ]]; then
-    LATEST_REVIEW=$("$GH_CMD" pr view "$PR_URL" --json reviews --jq '.reviews[-1].state' 2>/dev/null || echo "")
-    if [[ "$LATEST_REVIEW" == "APPROVED" ]]; then
-      APPROVED=true
-    fi
-  fi
-
-  if [[ "$APPROVED" == false ]]; then
+  if ! check_pr_review_state "$PR_URL" "APPROVED"; then
     log_info "$ISSUE_KEY: PR not approved. Skipping."
     continue
   fi
@@ -79,17 +65,7 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   board_add_comment "$ISSUE_KEY" "Merged by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). PR: $PR_URL ($MERGE_STRATEGY)"
 
-  if [[ -n "$RUNNER_MERGE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_MERGE_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY merged and moved to $RUNNER_MERGE_TO"
-    else
-      log_warn "No transition mapping found for status $RUNNER_MERGE_TO — card merged but not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Done: $ISSUE_KEY merged (no transition configured)"
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_MERGE_TO" "merged"
 
   # Promotion PR: if GIT_RELEASE_BRANCH is set and differs from GIT_BASE_BRANCH,
   # ensure an open PR exists from base → release branch

@@ -8,8 +8,8 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
-PROTECTED_BRANCHES="main master dev develop"
 WORKTREE_DIR="$SORTA_ROOT/.worktrees"
 
 log_info "Coder: checking $RUNNER_CODE_FROM lane..."
@@ -48,56 +48,9 @@ for ISSUE_ID in $ISSUE_IDS; do
   BRANCH_SLUG=$(slugify "$TITLE")
   BRANCH_NAME="claude/${ISSUE_KEY}-${BRANCH_SLUG}"
 
-  # Safety check
-  for protected in $PROTECTED_BRANCHES; do
-    if [[ "$BRANCH_NAME" == "$protected" ]]; then
-      log_error "Branch name matches protected branch. Skipping."
-      continue 2
-    fi
-  done
-
-  CARD_WORKTREE="$WORKTREE_DIR/$ISSUE_KEY"
-
-  # Clean up leftover worktree
-  if [[ -d "$CARD_WORKTREE" ]]; then
-    log_warn "Cleaning up leftover worktree..."
-    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || rm -rf "$CARD_WORKTREE" 2>/dev/null || {
-      log_warn "Locked worktree for $ISSUE_KEY. Using alternate directory."
-      CARD_WORKTREE="${CARD_WORKTREE}-$(date +%s)"
-    }
-  fi
-
-  # Create or reuse branch
-  if git -C "$REPO_ROOT" rev-parse --verify "$BRANCH_NAME" >/dev/null 2>&1; then
-    log_info "Branch $BRANCH_NAME already exists (retry case)."
-  else
-    log_info "Creating branch: $BRANCH_NAME from origin/$GIT_BASE_BRANCH"
-    git -C "$REPO_ROOT" branch "$BRANCH_NAME" "origin/$GIT_BASE_BRANCH"
-  fi
-
-  # Create worktree
-  mkdir -p "$WORKTREE_DIR"
-
-  git -C "$REPO_ROOT" worktree add "$CARD_WORKTREE" "$BRANCH_NAME" 2>/dev/null || {
-    log_error "Could not create worktree for $ISSUE_KEY"
+  CARD_WORKTREE=$(setup_worktree "$ISSUE_KEY" "$BRANCH_NAME" "$REPO_ROOT" "$WORKTREE_DIR") || {
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: worktree creation failed on $(date '+%Y-%m-%d %H:%M')."
     continue
-  }
-
-  # Copy Claude permissions into worktree
-  if [[ -f "$REPO_ROOT/.claude/settings.local.json" ]]; then
-    mkdir -p "$CARD_WORKTREE/.claude"
-    cp "$REPO_ROOT/.claude/settings.local.json" "$CARD_WORKTREE/.claude/settings.local.json"
-  else
-    log_warn "Missing .claude/settings.local.json — Claude Code won't have permissions to write files or run commands."
-    log_warn "Create it with: cp .claude/settings.local.json.example .claude/settings.local.json"
-  fi
-
-  # Install dependencies
-  log_info "Installing dependencies..."
-  (cd "$CARD_WORKTREE" && npm ci --silent 2>/dev/null) || {
-    log_warn "npm ci failed, trying npm install..."
-    (cd "$CARD_WORKTREE" && npm install --silent 2>/dev/null) || true
   }
 
   # Build prompt
@@ -115,13 +68,12 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   log_info "Running Claude Code in worktree..."
   claude_rc=0
-  run_claude "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
   if [[ "$claude_rc" -ne 0 ]]; then
-    [[ "$claude_rc" -eq 2 ]] && { git worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; }
+    [[ "$claude_rc" -eq 2 ]] && { git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; break; }
     log_error "Claude failed for $ISSUE_KEY"
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: implementation failed on $(date '+%Y-%m-%d %H:%M'). Manual intervention needed."
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
@@ -147,7 +99,7 @@ for ISSUE_ID in $ISSUE_IDS; do
     continue
   }
 
-  # Create PR
+  # Prepare PR body
   PR_BODY_FILE=$(mktemp)
   cat > "$PR_BODY_FILE" << PREOF
 ## $ISSUE_KEY: $TITLE
@@ -165,55 +117,60 @@ $IMPLEMENTATION_RESULT
 Automated by Sorta.Fit
 PREOF
 
-  # Retry PR creation — GitHub may not have indexed the pushed ref yet
-  pr_created=false
-  for attempt in 1 2 3; do
-    PR_URL=$("$GH_CMD" pr create \
-      --title "$ISSUE_KEY: $TITLE" \
-      --body-file "$PR_BODY_FILE" \
-      --base "$GIT_BASE_BRANCH" \
-      --head "$BRANCH_NAME" 2>&1) && {
-      pr_created=true
-      break
+  # Check for existing open PR on this branch
+  EXISTING_PR_URL=$("$GH_CMD" pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url' 2>/dev/null || echo "")
+
+  if [[ -n "$EXISTING_PR_URL" && "$EXISTING_PR_URL" != "null" ]]; then
+    # Rework case — update existing PR instead of creating a duplicate
+    PR_URL="$EXISTING_PR_URL"
+    pr_edit_ok=false
+    "$GH_CMD" pr edit "$PR_URL" --body-file "$PR_BODY_FILE" 2>/dev/null && pr_edit_ok=true || {
+      log_warn "Failed to update PR body for $PR_URL"
     }
-    if [[ $attempt -lt 3 ]]; then
-      log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
-      sleep 5
-    fi
-  done
-
-  if [[ "$pr_created" != "true" ]]; then
-    log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
-    board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
-    if [[ -n "$RUNNER_CODE_TO" ]]; then
-      local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
-      if [[ -n "${!local_transition:-}" ]]; then
-        board_transition "$ISSUE_KEY" "${!local_transition}"
-      else
-        log_warn "No transition mapping found for status $RUNNER_CODE_TO. Add $local_transition to your adapter config."
-      fi
-    fi
-    git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+    "$GH_CMD" pr comment "$PR_URL" --body "Rework pushed by Sorta.Fit — ready for re-review" 2>/dev/null || {
+      log_warn "Failed to post rework comment on $PR_URL"
+    }
     rm -f "$PR_BODY_FILE"
-    continue
-  fi
-
-  rm -f "$PR_BODY_FILE"
-  log_info "PR created: $PR_URL"
-
-  board_add_comment "$ISSUE_KEY" "PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
-
-  if [[ -n "$RUNNER_CODE_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY implemented and moved to $RUNNER_CODE_TO"
+    if [[ "$pr_edit_ok" == true ]]; then
+      log_info "PR updated: $PR_URL"
+      board_add_comment "$ISSUE_KEY" "PR updated: $PR_URL — Rework pushed by Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
     else
-      log_warn "No transition mapping found for status $RUNNER_CODE_TO — card implemented but not moved. Add $local_transition to your adapter config."
+      log_warn "PR body update failed, but rework commits pushed to branch"
+      board_add_comment "$ISSUE_KEY" "Rework pushed to branch (PR body update failed): $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
     fi
   else
-    log_info "Done: $ISSUE_KEY implemented (no transition configured)"
+    # New PR case — create with retry (GitHub may not have indexed the pushed ref yet)
+    pr_created=false
+    for attempt in 1 2 3; do
+      PR_URL=$("$GH_CMD" pr create \
+        --title "$ISSUE_KEY: $TITLE" \
+        --body-file "$PR_BODY_FILE" \
+        --base "$GIT_BASE_BRANCH" \
+        --head "$BRANCH_NAME" 2>&1) && {
+        pr_created=true
+        break
+      }
+      if [[ $attempt -lt 3 ]]; then
+        log_warn "PR creation attempt $attempt failed for $ISSUE_KEY, retrying in 5s..."
+        sleep 5
+      fi
+    done
+
+    if [[ "$pr_created" != "true" ]]; then
+      log_error "PR creation failed for $ISSUE_KEY after 3 attempts: $PR_URL"
+      board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
+      runner_transition "$ISSUE_KEY" "$RUNNER_CODE_TO" "implemented"
+      git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
+      rm -f "$PR_BODY_FILE"
+      continue
+    fi
+
+    rm -f "$PR_BODY_FILE"
+    log_info "PR created: $PR_URL"
+    board_add_comment "$ISSUE_KEY" "PR opened: $PR_URL — Sorta.Fit $(date '+%Y-%m-%d %H:%M')"
   fi
+
+  runner_transition "$ISSUE_KEY" "$RUNNER_CODE_TO" "implemented"
 
   git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))

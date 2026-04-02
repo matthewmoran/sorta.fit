@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 log_info "Reviewer: checking $RUNNER_REVIEW_FROM lane..."
 
@@ -30,18 +31,24 @@ for ISSUE_ID in $ISSUE_IDS; do
   ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
   COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
 
-  # Find PR URL in comments
-  PR_URL=$(echo "$COMMENTS" | grep -oE 'https://github\.com/[^/]+/[^/]+/pull/[0-9]+' | head -1)
+  # Find most recent PR URL in comments
+  PR_URL=$(extract_pr_url "$COMMENTS")
 
   if [[ -z "$PR_URL" ]]; then
     log_info "No PR URL found for $ISSUE_KEY. Skipping."
     continue
   fi
 
-  # Check if already reviewed by Sorta.Fit
+  # Check if already reviewed by Sorta.Fit (allow re-review after rework)
+  # Assumes comments are returned in chronological order (line N < line M ⟹ N is older)
   if echo "$COMMENTS" | grep -q "Code Review —"; then
-    log_info "$ISSUE_KEY already reviewed. Skipping."
-    continue
+    last_review_line=$(echo "$COMMENTS" | grep -n "Code Review —" | tail -1 | cut -d: -f1)
+    last_rework_line=$(echo "$COMMENTS" | grep -n "Rework pushed by Sorta.Fit" | tail -1 | cut -d: -f1)
+    if [[ -z "$last_rework_line" ]] || [[ "$last_review_line" -gt "$last_rework_line" ]]; then
+      log_info "$ISSUE_KEY already reviewed. Skipping."
+      continue
+    fi
+    log_info "$ISSUE_KEY has rework after last review. Re-reviewing."
   fi
 
   log_step "Reviewing: $ISSUE_KEY — $PR_URL"
@@ -78,11 +85,10 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   log_info "Running Claude for review..."
   claude_rc=0
-  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
-  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then break; fi
   if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for review of $ISSUE_KEY"
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
@@ -130,17 +136,7 @@ for ISSUE_ID in $ISSUE_IDS; do
 
 $REVIEW"
 
-  if [[ -n "$RUNNER_REVIEW_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_REVIEW_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Review complete for $ISSUE_KEY. Moved to $RUNNER_REVIEW_TO."
-    else
-      log_warn "No transition mapping found for status $RUNNER_REVIEW_TO — review complete but card not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Review complete for $ISSUE_KEY. Card stays in $RUNNER_REVIEW_FROM."
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_REVIEW_TO" "reviewed"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 

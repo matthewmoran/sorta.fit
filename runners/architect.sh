@@ -8,6 +8,7 @@ SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SORTA_ROOT/core/config.sh"
 source "$SORTA_ROOT/core/utils.sh"
 source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
 
 log_info "Architect: checking $RUNNER_ARCHITECT_FROM lane..."
 
@@ -44,11 +45,10 @@ for ISSUE_ID in $ISSUE_IDS; do
   printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
   claude_rc=0
-  run_claude "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
-  if [[ "$claude_rc" -eq 2 ]]; then rm -f "$PROMPT_FILE" "$RESULT_FILE"; break; fi
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then break; fi
   if [[ "$claude_rc" -ne 0 ]]; then
     log_error "Claude failed for $ISSUE_KEY, skipping"
-    rm -f "$PROMPT_FILE" "$RESULT_FILE"
     continue
   fi
 
@@ -69,17 +69,7 @@ $ARCH_PLAN"
   board_update_description "$ISSUE_KEY" "$UPDATED_DESC"
   board_add_comment "$ISSUE_KEY" "Card architected by Sorta.Fit on $(date '+%Y-%m-%d %H:%M'). Ready for implementation."
 
-  if [[ -n "$RUNNER_ARCHITECT_TO" ]]; then
-    local_transition="TRANSITION_TO_${RUNNER_ARCHITECT_TO}"
-    if [[ -n "${!local_transition:-}" ]]; then
-      board_transition "$ISSUE_KEY" "${!local_transition}"
-      log_info "Done: $ISSUE_KEY architected and moved to $RUNNER_ARCHITECT_TO"
-    else
-      log_warn "No transition mapping found for status $RUNNER_ARCHITECT_TO — card architected but not moved. Add $local_transition to your adapter config."
-    fi
-  else
-    log_info "Done: $ISSUE_KEY architected (no transition configured)"
-  fi
+  runner_transition "$ISSUE_KEY" "$RUNNER_ARCHITECT_TO" "architected"
   BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
 done
 

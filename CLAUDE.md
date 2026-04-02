@@ -71,30 +71,58 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 
 `prompts/*.md` files use `{{KEY}}` placeholders (e.g., `{{CARD_KEY}}`, `{{CARD_TITLE}}`), rendered at runtime by `render_template` in `core/utils.sh`.
 
+## Shared Runner Library
+
+`core/runner-lib.sh` provides shared functions used across runners. **All runners must source it** after `utils.sh` and the adapter:
+
+```bash
+source "$SORTA_ROOT/core/runner-lib.sh"
+```
+
+Key functions:
+- `runner_transition <issue_key> <target_status> <verb>` — handles transition with guard check and logging
+- `setup_worktree <issue_key> <branch_name> <repo_root> <worktree_dir>` — full worktree lifecycle (branch, create, settings, npm install). **Returns the worktree path via stdout** — all log output inside this function MUST go to stderr (`>&2`) so it doesn't get captured by `$()`.
+- `run_claude_safe <prompt_file> <result_file> [work_dir]` — wraps `run_claude` with temp file cleanup on failure
+- `check_pr_review_state <pr_url> <expected_state>` — checks GitHub PR review decision
+- `extract_pr_url <comments_text>` — extracts GitHub PR URL from text
+
+When adding shared functions that return values via stdout, **always redirect log output to stderr** to avoid polluting the captured output.
+
 ## Code Conventions
 
 - All scripts use `#!/usr/bin/env bash` and `set -euo pipefail`
 - Logging via `log_info`, `log_warn`, `log_error`, `log_step` from `core/utils.sh` — no bare `echo`
+- `log_warn` and `log_error` write to stderr; `log_info` and `log_step` write to stdout — be aware of this when capturing output with `$()`
 - UPPERCASE for env/exported variables, lowercase for locals
+- Do not use `local` outside of functions — runner scripts run as top-level processes, not functions, and `local` will error
 - 2-space indentation, LF line endings only
 - Allowed dependencies: Bash, Git, Node.js, curl, gh (GitHub CLI), claude — no Python, jq, or other external tools
 - No hardcoded values; use env vars and config
+- Git operations in runners use `git -C "$REPO_ROOT"` or `git -C "$TARGET_REPO"` — never bare `git` — so sorta.fit can operate on a separate repository
+- Claude execution in runners uses `run_claude_safe` (or `run_claude`) — never call `claude -p` directly
 
 ## Safety Invariants
 
-- The `code` runner uses **isolated git worktrees** (`.worktrees/`); the main working tree is never modified
+- The `code` and `documenter` runners use **isolated git worktrees** (`.worktrees/`); the main working tree is never modified
 - Branches named `main`, `master`, `dev`, `develop` are **never checked out** by runners
 - AI-created branches are always prefixed `claude/{ISSUE_KEY}-{slug}`
 - No `git push --force` or destructive git operations
 - `.automation.lock` prevents overlapping polling cycles
+- Claude Code permissions are restricted via `.claude/settings.local.json` — specific bash commands are allowlisted, destructive commands (`rm -rf`, `sudo`, `curl`, `git push --force`) are denylisted
+- Prompts include **sensitive data rules** — Claude must never hardcode secrets, log .env contents, or document internal URLs/credentials
+- The Jira adapter (`jira_curl`) validates API responses — checks HTTP status and rejects HTML responses with a clear error instead of passing them to JSON.parse
+- Write operations (`board_update_description`, `board_add_comment`, `board_transition`) suppress response output to `/dev/null`
 
 ## Extension Points
 
-- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, add to `RUNNERS_ENABLED` in `.env`. See [`docs/writing-runners.md`](docs/writing-runners.md) for a complete step-by-step guide.
+- **New runner:** Create `runners/{name}.sh` + `prompts/{name}.md`, source `runner-lib.sh`, use shared functions (`runner_transition`, `run_claude_safe`, etc.), add to `RUNNERS_ENABLED` in `.env`. See [`docs/writing-runners.md`](docs/writing-runners.md) for a complete step-by-step guide.
 - **New adapter:** Create `adapters/{name}.sh` implementing all `board_*` functions + `adapters/{name}.config.sh.example`
+- **Setup wizard:** When adding a new runner, update three places: `RUNNER_DEFS` array in `setup/index.html`, the routing defaults, and the `.env` template in `setup/server.js` `handleSaveConfig`
 
 ## Configuration
 
-All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `GIT_BASE_BRANCH`, `GIT_RELEASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing. The documenter runner also uses `DOCS_DIR` (target directory for generated docs, default `docs`) and `DOCS_ORGANIZE_BY` (organization strategy, default `feature`).
+All config lives in `.env` (see `.env.example`). Key variables: `BOARD_ADAPTER`, `BOARD_DOMAIN`, `BOARD_API_TOKEN`, `BOARD_PROJECT_KEY`, `TARGET_REPO`, `GIT_BASE_BRANCH`, `GIT_RELEASE_BRANCH`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, `MAX_SKIP_RETRIES`, and per-runner `MAX_CARDS_*` / `RUNNER_*_FROM` / `RUNNER_*_TO` lane routing. The documenter runner also uses `DOCS_DIR` (target directory for generated docs, default `docs`) and `DOCS_ORGANIZE_BY` (organization strategy, default `feature`).
+
+`TARGET_REPO` is the absolute path to the repository sorta.fit operates on. If not set, falls back to the current git root. This allows sorta.fit to live in a different directory from the project it automates.
 
 Runner lane routing uses **Jira status IDs** (not names). `RUNNER_*_FROM` is the status ID to query cards from; `RUNNER_*_TO` is the status ID to transition cards to (resolved via `TRANSITION_TO_<id>` in the adapter config). Run the setup wizard to discover your board's IDs.

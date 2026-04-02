@@ -14,6 +14,7 @@
       "Bash(git branch*)",
       "Bash(git checkout*)",
       "Bash(git switch*)",
+      "Bash(git push*claude/*)",
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(node *)",
