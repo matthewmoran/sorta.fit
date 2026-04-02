@@ -187,7 +187,11 @@ PREOF
     board_add_comment "$ISSUE_KEY" "Sorta.Fit: branch pushed but PR creation failed on $(date '+%Y-%m-%d %H:%M'). Branch: $BRANCH_NAME"
     if [[ -n "$RUNNER_CODE_TO" ]]; then
       local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
-      board_transition "$ISSUE_KEY" "${!local_transition}"
+      if [[ -n "${!local_transition:-}" ]]; then
+        board_transition "$ISSUE_KEY" "${!local_transition}"
+      else
+        log_warn "No transition mapping found for status $RUNNER_CODE_TO. Add $local_transition to your adapter config."
+      fi
     fi
     git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true
     rm -f "$PR_BODY_FILE"
@@ -201,8 +205,12 @@ PREOF
 
   if [[ -n "$RUNNER_CODE_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_CODE_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY implemented and moved to $RUNNER_CODE_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY implemented and moved to $RUNNER_CODE_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_CODE_TO — card implemented but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY implemented (no transition configured)"
   fi

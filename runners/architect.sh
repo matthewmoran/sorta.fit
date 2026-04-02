@@ -71,8 +71,12 @@ $ARCH_PLAN"
 
   if [[ -n "$RUNNER_ARCHITECT_TO" ]]; then
     local_transition="TRANSITION_TO_${RUNNER_ARCHITECT_TO}"
-    board_transition "$ISSUE_KEY" "${!local_transition}"
-    log_info "Done: $ISSUE_KEY architected and moved to $RUNNER_ARCHITECT_TO"
+    if [[ -n "${!local_transition:-}" ]]; then
+      board_transition "$ISSUE_KEY" "${!local_transition}"
+      log_info "Done: $ISSUE_KEY architected and moved to $RUNNER_ARCHITECT_TO"
+    else
+      log_warn "No transition mapping found for status $RUNNER_ARCHITECT_TO — card architected but not moved. Add $local_transition to your adapter config."
+    fi
   else
     log_info "Done: $ISSUE_KEY architected (no transition configured)"
   fi
