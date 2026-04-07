@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# GitHub Issues adapter configuration — label-based status mappings
+# Run the setup wizard or use board_discover to find these values
+# Copy this to github-issues.config.sh and fill in your repo's labels
+#
+# GitHub Issues uses labels with a "status:" prefix for lane mapping.
+# Create labels like: status:todo, status:refined, status:in-progress, status:qa, status:done
+# Status IDs are the full label names (e.g., "status:todo")
+# Transition IDs are also label names (label swap removes old status label, adds new one)
+
+# Status label → display name
+STATUS_status:todo="To Do"
+STATUS_status:refined="Refined"
+STATUS_status:agent="Agent"
+STATUS_status:in-progress="In Progress"
+STATUS_status:qa="QA"
+STATUS_status:done="Done"
+STATUS_status:backlog="Backlog"
+
+# How to transition a card TO each status
+# For GitHub Issues, the transition ID is the target label name itself
+TRANSITION_TO_status:todo=status:todo
+TRANSITION_TO_status:refined=status:refined
+TRANSITION_TO_status:agent=status:agent
+TRANSITION_TO_status:in-progress=status:in-progress
+TRANSITION_TO_status:qa=status:qa
+TRANSITION_TO_status:done=status:done
+TRANSITION_TO_status:backlog=status:backlog

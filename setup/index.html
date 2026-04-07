@@ -942,26 +942,40 @@ select option:disabled {
         '<label for="adapter">Adapter</label>' +
         '<select id="adapter" onchange="window._wizBoardField(\'adapter\', this.value)">' +
           '<option value="jira"' + (c.adapter === "jira" ? " selected" : "") + '>Jira</option>' +
-          '<option value="linear" disabled>Linear (coming soon)</option>' +
-          '<option value="github-issues" disabled>GitHub Issues (coming soon)</option>' +
+          '<option value="linear"' + (c.adapter === "linear" ? " selected" : "") + '>Linear</option>' +
+          '<option value="github-issues"' + (c.adapter === "github-issues" ? " selected" : "") + '>GitHub Issues</option>' +
         '</select>' +
       '</div>' +
-      '<div class="form-group">' +
-        '<label for="domain">Board Domain</label>' +
-        '<span class="hint">e.g. yourteam.atlassian.net</span>' +
-        '<input type="text" id="domain" value="' + escHtml(c.domain) + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
-      '</div>' +
-      '<div class="form-group">' +
-        '<label for="email">Email</label>' +
-        '<input type="email" id="email" value="' + escHtml(c.email) + '" onchange="window._wizBoardField(\'email\', this.value)" />' +
-      '</div>' +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="domain">Board Domain</label>' +
+          '<span class="hint">e.g. yourteam.atlassian.net</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain) + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+      c.adapter === 'linear' ?
+        '<div class="form-group">' +
+          '<label for="domain">API Endpoint</label>' +
+          '<span class="hint">Default: api.linear.app</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'api.linear.app') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+        '<div class="form-group">' +
+          '<label for="domain">GitHub Domain</label>' +
+          '<span class="hint">Default: github.com</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'github.com') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>') +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="email">Email</label>' +
+          '<input type="email" id="email" value="' + escHtml(c.email) + '" onchange="window._wizBoardField(\'email\', this.value)" />' +
+        '</div>' : '') +
       '<div class="form-group">' +
         '<label for="apiToken">API Token</label>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'Atlassian API token' : c.adapter === 'linear' ? 'Linear API key (Settings &rarr; API)' : 'GitHub personal access token') + '</span>' +
         '<input type="password" id="apiToken" value="' + escHtml(c.apiToken) + '" onchange="window._wizBoardField(\'apiToken\', this.value)" />' +
       '</div>' +
       '<div class="form-group">' +
         '<label for="projectKey">Project Key</label>' +
-        '<span class="hint">e.g. PROJ</span>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'e.g. PROJ' : c.adapter === 'linear' ? 'Team key, e.g. ENG' : 'owner/repo, e.g. acme/my-project') + '</span>' +
         '<input type="text" id="projectKey" value="' + escHtml(c.projectKey) + '" onchange="window._wizBoardField(\'projectKey\', this.value)" />' +
       '</div>' +
       '<div style="display:flex;gap:12px">' +
@@ -1018,12 +1032,15 @@ select option:disabled {
     state.config[field] = val;
     state.connectionTested = false;
     state.boardDiscovered = false;
+    if (field === 'adapter') renderCard();
   };
 
   window._wizTestConn = async function() {
     var c = state.config;
     hideMsg("connMsg");
-    if (!c.domain || !c.email || !c.apiToken || !c.projectKey) {
+    var missingFields = !c.domain || !c.apiToken || !c.projectKey;
+    if (c.adapter === 'jira') missingFields = missingFields || !c.email;
+    if (missingFields) {
       showMsg("connMsg", "error", "Please fill in all fields before testing the connection.");
       return;
     }

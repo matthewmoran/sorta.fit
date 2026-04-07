@@ -193,13 +193,13 @@ async function handleLoadConfig(req, res) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
 
-      const statusMatch = trimmed.match(/^STATUS_(\d+)=["']?(.+?)["']?$/);
+      const statusMatch = trimmed.match(/^STATUS_([^=]+)=["']?(.+?)["']?$/);
       if (statusMatch) {
         statuses.push({ id: statusMatch[1], name: statusMatch[2] });
         continue;
       }
 
-      const transMatch = trimmed.match(/^TRANSITION_TO_(\d+)=(\d+)$/);
+      const transMatch = trimmed.match(/^TRANSITION_TO_([^=]+)=(.+)$/);
       if (transMatch) {
         transitions.push({ statusId: transMatch[1], transitionId: transMatch[2] });
       }
@@ -337,6 +337,121 @@ async function handleTestConnection(req, res) {
         const msg = result.data && result.data.message
           ? result.data.message
           : `HTTP ${result.statusCode} — check credentials and domain`;
+        sendJSON(res, 200, { success: false, message: msg });
+      }
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Connection failed: ${err.message}` });
+    }
+  } else if (adapter === 'linear') {
+    try {
+      const https = require('https');
+      const payload = JSON.stringify({
+        query: '{ viewer { id name email } }',
+      });
+
+      const result = await new Promise((resolve, reject) => {
+        const reqOpts = {
+          hostname: 'api.linear.app',
+          port: 443,
+          path: '/graphql',
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        };
+
+        const request = https.request(reqOpts, (response) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            const raw = Buffer.concat(chunks).toString('utf-8');
+            try {
+              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+            } catch {
+              resolve({ statusCode: response.statusCode, data: raw });
+            }
+          });
+        });
+
+        request.on('error', reject);
+        request.setTimeout(15000, () => {
+          request.destroy();
+          reject(new Error('Request timed out'));
+        });
+        request.end(payload);
+      });
+
+      if (result.statusCode === 200 && result.data && result.data.data && result.data.data.viewer && result.data.data.viewer.name) {
+        sendJSON(res, 200, {
+          success: true,
+          message: `Connected as ${result.data.data.viewer.name} (${result.data.data.viewer.email || ''})`,
+          user: {
+            displayName: result.data.data.viewer.name,
+            emailAddress: result.data.data.viewer.email,
+          },
+        });
+      } else {
+        const errors = result.data && result.data.errors;
+        const msg = errors && errors.length
+          ? errors[0].message
+          : `HTTP ${result.statusCode} — check API token`;
+        sendJSON(res, 200, { success: false, message: msg });
+      }
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Connection failed: ${err.message}` });
+    }
+  } else if (adapter === 'github-issues') {
+    try {
+      const https = require('https');
+      const repoPath = projectKey || '';
+      const apiPath = `/repos/${repoPath}`;
+
+      const result = await new Promise((resolve, reject) => {
+        const reqOpts = {
+          hostname: 'api.github.com',
+          port: 443,
+          path: apiPath,
+          method: 'GET',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'SortaFit-Setup',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        };
+
+        const request = https.request(reqOpts, (response) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            const raw = Buffer.concat(chunks).toString('utf-8');
+            try {
+              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+            } catch {
+              resolve({ statusCode: response.statusCode, data: raw });
+            }
+          });
+        });
+
+        request.on('error', reject);
+        request.setTimeout(15000, () => {
+          request.destroy();
+          reject(new Error('Request timed out'));
+        });
+        request.end();
+      });
+
+      if (result.statusCode === 200 && result.data && result.data.full_name) {
+        sendJSON(res, 200, {
+          success: true,
+          message: `Connected to ${result.data.full_name} (${result.data.open_issues_count} open issues)`,
+        });
+      } else {
+        const msg = result.data && result.data.message
+          ? result.data.message
+          : `HTTP ${result.statusCode} — check token and project key (owner/repo)`;
         sendJSON(res, 200, { success: false, message: msg });
       }
     } catch (err) {
@@ -494,6 +609,153 @@ async function handleDiscoverBoard(req, res) {
         }
       }
       const transitions = Array.from(transitionMap.values());
+
+      sendJSON(res, 200, { success: true, statuses, transitions });
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
+    }
+  } else if (adapter === 'linear') {
+    const https = require('https');
+
+    function linearPost(query) {
+      return new Promise((resolve, reject) => {
+        const payload = JSON.stringify({ query });
+        const reqOpts = {
+          hostname: 'api.linear.app',
+          port: 443,
+          path: '/graphql',
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        };
+
+        const request = https.request(reqOpts, (response) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            const raw = Buffer.concat(chunks).toString('utf-8');
+            try {
+              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+            } catch {
+              resolve({ statusCode: response.statusCode, data: raw });
+            }
+          });
+        });
+
+        request.on('error', reject);
+        request.setTimeout(15000, () => {
+          request.destroy();
+          reject(new Error('Request timed out'));
+        });
+        request.end(payload);
+      });
+    }
+
+    try {
+      const teamQuery = `{ teams(filter: { key: { eq: "${projectKey}" } }) { nodes { id states { nodes { id name type } } } } }`;
+      const teamResult = await linearPost(teamQuery);
+
+      if (teamResult.statusCode !== 200 || !teamResult.data || !teamResult.data.data) {
+        const errors = teamResult.data && teamResult.data.errors;
+        const msg = errors && errors.length ? errors[0].message : `HTTP ${teamResult.statusCode}`;
+        return sendJSON(res, 200, { success: false, message: `Discovery failed: ${msg}` });
+      }
+
+      const teams = teamResult.data.data.teams && teamResult.data.data.teams.nodes;
+      if (!teams || !teams.length) {
+        return sendJSON(res, 200, { success: false, message: `Team "${projectKey}" not found. Check BOARD_PROJECT_KEY.` });
+      }
+
+      const states = teams[0].states.nodes || [];
+      const statuses = states.map(s => ({ id: s.id, name: `${s.name} (${s.type})` }));
+
+      // In Linear, transitions are direct state-to-state; every state is a valid target
+      const transitions = states.map(s => ({
+        id: s.id,
+        name: s.name,
+        toName: s.name,
+        toId: s.id,
+      }));
+
+      sendJSON(res, 200, { success: true, statuses, transitions });
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
+    }
+  } else if (adapter === 'github-issues') {
+    const https = require('https');
+
+    function githubGet(apiPath) {
+      return new Promise((resolve, reject) => {
+        const reqOpts = {
+          hostname: 'api.github.com',
+          port: 443,
+          path: apiPath,
+          method: 'GET',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'SortaFit-Setup',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        };
+
+        const request = https.request(reqOpts, (response) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            const raw = Buffer.concat(chunks).toString('utf-8');
+            try {
+              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+            } catch {
+              resolve({ statusCode: response.statusCode, data: raw });
+            }
+          });
+        });
+
+        request.on('error', reject);
+        request.setTimeout(15000, () => {
+          request.destroy();
+          reject(new Error('Request timed out'));
+        });
+        request.end();
+      });
+    }
+
+    try {
+      const labelsResult = await githubGet(`/repos/${projectKey}/labels?per_page=100`);
+
+      if (labelsResult.statusCode !== 200) {
+        const msg = labelsResult.data && labelsResult.data.message
+          ? labelsResult.data.message
+          : `HTTP ${labelsResult.statusCode}`;
+        return sendJSON(res, 200, { success: false, message: `Discovery failed: ${msg}` });
+      }
+
+      const labels = Array.isArray(labelsResult.data) ? labelsResult.data : [];
+      const statusLabels = labels.filter(l => l.name.startsWith('status:'));
+
+      if (!statusLabels.length) {
+        return sendJSON(res, 200, {
+          success: false,
+          message: 'No "status:" labels found. Create labels with a "status:" prefix (e.g., status:todo, status:refined, status:in-progress, status:done) and run discovery again.',
+        });
+      }
+
+      const statuses = statusLabels.map(l => ({
+        id: l.name,
+        name: l.description || l.name.replace('status:', ''),
+      }));
+
+      // GitHub Issues transitions are label swaps; all-to-all
+      const transitions = statusLabels.map(l => ({
+        id: l.name,
+        name: l.name,
+        toName: l.description || l.name.replace('status:', ''),
+        toId: l.name,
+      }));
 
       sendJSON(res, 200, { success: true, statuses, transitions });
     } catch (err) {
