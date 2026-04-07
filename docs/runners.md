@@ -14,7 +14,6 @@ Runners are the individual automation steps that Sorta runs. Each runner reads c
 | bounce | QA | Agent | Yes | Moves rejected PRs back for rework |
 | merge | QA | Done | Yes | Merges approved PRs |
 | documenter | (configurable) | (configurable) | Yes | Generates/updates feature docs, opens PR |
-| merge | QA (configurable) | Done (configurable) | Yes | Merges approved PRs, optionally opens promotion PR |
 | release-notes | (manual) | stdout | No | Generates changelog from git history |
 
 ---
@@ -396,47 +395,6 @@ Edit `prompts/documenter.md`. The template uses these placeholders:
 | `{{BASE_BRANCH}}` | The base branch name |
 | `{{DOCS_DIR}}` | Target docs directory |
 | `{{DOCS_ORGANIZE_BY}}` | Organization strategy |
-
----
-
-## merge
-
-**File:** `runners/merge.sh`
-
-### What It Does
-
-Picks up cards from the configured source lane (typically QA) whose PR has been approved. For each card:
-
-1. Extracts a GitHub PR URL from card comments
-2. Checks the PR's review decision via `gh pr view`; skips if not approved
-3. Merges the PR using `gh pr merge` with the method set by `MERGE_STRATEGY` (merge, squash, or rebase)
-4. Adds a board comment noting the merge timestamp, PR URL, and merge method
-5. Transitions the card to the configured target lane
-6. If `GIT_RELEASE_BRANCH` is set, checks for (and opens if missing) a promotion PR from `GIT_BASE_BRANCH` to `GIT_RELEASE_BRANCH`
-
-This runner does not invoke Claude — it is purely mechanical. No prompt template is needed.
-
-On merge failure, an error comment is added to the card and the card is not transitioned.
-
-### Lane Flow
-
-```
-QA --> [PR approved?] --> gh pr merge --> Done
-```
-
-### Config Variables
-
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `MAX_CARDS_MERGE` | `10` | Maximum cards to process per cycle |
-| `MERGE_STRATEGY` | `merge` | Merge method: `merge`, `squash`, or `rebase` |
-| `GIT_RELEASE_BRANCH` | (empty) | If set, opens a promotion PR from `GIT_BASE_BRANCH` to this branch after each merge |
-
-### Running Standalone
-
-```bash
-bash runners/merge.sh
-```
 
 ---
 

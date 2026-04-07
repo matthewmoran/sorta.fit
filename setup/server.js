@@ -578,7 +578,7 @@ RUNNERS_ENABLED=${e.RUNNERS_ENABLED || 'refine,code'}
 CLAUDE_AGENT=${e.CLAUDE_AGENT || ''}
 
 # =============================================================================
-# Recipe Lane Routing (status IDs from your board)
+# Runner Lane Routing (status IDs from your board)
 # =============================================================================
 
 RUNNER_REFINE_FROM=${e.RUNNER_REFINE_FROM || ''}
