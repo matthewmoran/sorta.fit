@@ -301,13 +301,13 @@ nav {
   opacity: 1;
 }
 
-/* ---- Recipes ---- */
+/* ---- Runners ---- */
 
-.recipes-section {
+.runners-section {
   padding: 100px 24px;
 }
 
-.recipes-grid {
+.runners-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
@@ -315,7 +315,7 @@ nav {
   margin: 0 auto;
 }
 
-.recipe-card {
+.runner-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -325,29 +325,29 @@ nav {
   transition: opacity 0.5s, transform 0.5s, border-color 0.2s;
 }
 
-.recipe-card.visible {
+.runner-card.visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-.recipe-card:hover {
+.runner-card:hover {
   border-color: var(--accent);
 }
 
-.recipe-card h3 {
+.runner-card h3 {
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 4px;
 }
 
-.recipe-card .lane {
+.runner-card .lane {
   font-size: 12px;
   color: var(--accent);
   font-weight: 600;
   margin-bottom: 12px;
 }
 
-.recipe-card p {
+.runner-card p {
   font-size: 14px;
   color: var(--text-muted);
   line-height: 1.6;
@@ -543,54 +543,54 @@ footer a:hover {
 </section>
 
 <!-- Runners -->
-<section class="recipes-section" id="runners">
+<section class="runners-section" id="runners">
   <div style="text-align:center">
     <div class="section-label">Runners</div>
     <div class="section-title">Your runners, one loop.</div>
     <p class="section-desc">Each runner handles a different stage of your sprint. Enable what you need, configure the lanes, and let it run. All lanes are configurable.</p>
   </div>
-  <div class="recipes-grid">
-    <div class="recipe-card" data-reveal>
+  <div class="runners-grid">
+    <div class="runner-card" data-reveal>
       <h3>Refine</h3>
       <div class="lane">To Do &#8594; Refined</div>
       <p>Turns card titles into structured specs with acceptance criteria, technical context, and testing requirements.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Architect</h3>
       <div class="lane">Refined &#8594; Architected</div>
       <p>Analyzes the codebase and produces an implementation plan with file targets, dependencies, and trade-offs.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Code</h3>
       <div class="lane">Agent &#8594; QA</div>
       <p>Implements features in isolated worktrees, runs tests, and opens pull requests automatically.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Review</h3>
       <div class="lane">QA</div>
       <p>Fetches PR diffs, runs a structured code review, and posts it directly on GitHub.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Bounce</h3>
       <div class="lane">QA &#8594; Agent</div>
       <p>Detects rejected PR reviews and sends cards back for rework. Escalates to a human after 3 attempts.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Merge</h3>
       <div class="lane">QA &#8594; Done</div>
       <p>Merges approved pull requests with a configurable merge strategy and transitions the card to done.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Triage</h3>
       <div class="lane">To Do &#8594; Refined</div>
       <p>Analyzes bug reports against the codebase, identifies root causes, and writes triage reports.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Documenter</h3>
       <div class="lane">Configurable</div>
       <p>Generates and updates project docs from card specs in isolated worktrees, then opens a PR.</p>
     </div>
-    <div class="recipe-card" data-reveal>
+    <div class="runner-card" data-reveal>
       <h3>Release Notes</h3>
       <div class="lane">Manual</div>
       <p>Generates grouped changelogs from git history. Run it when you're ready to ship.</p>
