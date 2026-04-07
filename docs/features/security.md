@@ -25,7 +25,7 @@ Board API tokens (e.g., Jira personal access tokens) are stored in the `.env` fi
 
 The setup wizard (`setup/server.js`) handles credentials in its `/api/test-connection` and `/api/save-config` endpoints. Credentials are received over HTTP from the browser, used for a single API call, and written to `.env`. The wizard binds to `127.0.0.1` only --- it is not reachable from other machines.
 
-All API endpoints require a session token (`X-Session-Token` header). A cryptographically random 256-bit token is generated on each wizard startup using `crypto.randomBytes(32)` and compared using `crypto.timingSafeEqual()` to prevent timing attacks. The token is printed to the terminal on startup and injected into the served HTML page automatically, so no manual copy-paste is needed. Unauthenticated requests to any `/api/*` endpoint receive a `401 Unauthorized` response.
+All API endpoints require a session token (`X-Session-Token` header). A cryptographically random 256-bit token is generated on each wizard startup using `crypto.randomBytes(32)` and compared using `crypto.timingSafeEqual()` to prevent timing attacks. The token is ephemeral — it is never persisted to disk and is regenerated on every restart, so restarting the wizard invalidates all prior tokens. The token is printed to the terminal on startup and injected into the served HTML via a `<meta>` tag at serve time, so no manual copy-paste is needed. Unauthenticated requests to any `/api/*` endpoint receive a `401 Unauthorized` response.
 
 ## Input Validation
 
