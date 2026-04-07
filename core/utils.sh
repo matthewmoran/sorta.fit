@@ -141,7 +141,7 @@ run_claude() {
   local exit_code_file
   exit_code_file=$(mktemp)
 
-  ( cd "$work_dir" && claude -p "$(cat "$prompt_file")" --verbose --output-format stream-json $agent_flag 2>"$stderr_file"; echo $? > "$exit_code_file" ) | \
+  ( cd "$work_dir" && cat "$prompt_file" | claude -p --verbose --output-format stream-json $agent_flag 2>"$stderr_file"; echo $? > "$exit_code_file" ) | \
     node -e "
       const fs=require('fs');
       const rl=require('readline').createInterface({input:process.stdin});
