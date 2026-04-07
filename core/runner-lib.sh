@@ -91,18 +91,19 @@ setup_worktree() {
 }
 
 # Run Claude with cleanup on failure
-# Usage: run_claude_safe <prompt_file> <result_file> [work_dir]
+# Usage: run_claude_safe <prompt_file> <result_file> [work_dir] [agent]
 # Returns 0 on success, 1 on error (files cleaned), 2 on rate limit (files cleaned)
 run_claude_safe() {
   local prompt_file="$1"
   local result_file="$2"
   local work_dir="${3:-}"
+  local agent="${4:-}"
   local rc=0
 
   if [[ -n "$work_dir" ]]; then
-    run_claude "$prompt_file" "$result_file" "$work_dir" || rc=$?
+    run_claude "$prompt_file" "$result_file" "$work_dir" "$agent" || rc=$?
   else
-    run_claude "$prompt_file" "$result_file" || rc=$?
+    run_claude "$prompt_file" "$result_file" "" "$agent" || rc=$?
   fi
 
   if [[ "$rc" -ne 0 ]]; then

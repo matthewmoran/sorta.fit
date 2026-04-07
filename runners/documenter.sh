@@ -80,7 +80,7 @@ for ISSUE_ID in $ISSUE_IDS; do
 
   log_info "Running Claude Code in worktree..."
   claude_rc=0
-  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" || claude_rc=$?
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" "$CARD_WORKTREE" "${RUNNER_DOCUMENTER_AGENT:-$CLAUDE_AGENT}" || claude_rc=$?
   if [[ "$claude_rc" -ne 0 ]]; then
     [[ "$claude_rc" -eq 2 ]] && { git -C "$REPO_ROOT" worktree remove "$CARD_WORKTREE" --force 2>/dev/null || true; break; }
     log_error "Claude failed for $ISSUE_KEY"

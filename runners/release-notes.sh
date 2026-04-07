@@ -48,7 +48,7 @@ Output the release notes in markdown format."
 PROMPT_FILE=$(mktemp)
 RESULT_FILE=$(mktemp)
 printf '%s' "$PROMPT" > "$PROMPT_FILE"
-run_claude "$PROMPT_FILE" "$RESULT_FILE"
+run_claude "$PROMPT_FILE" "$RESULT_FILE" "" "${RUNNER_RELEASE_NOTES_AGENT:-$CLAUDE_AGENT}"
 claude_rc=$?
 rm -f "$PROMPT_FILE"
 if [[ "$claude_rc" -ne 0 ]]; then

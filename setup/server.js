@@ -572,23 +572,34 @@ MERGE_STRATEGY=${e.MERGE_STRATEGY || 'merge'}
 RUNNERS_ENABLED=${e.RUNNERS_ENABLED || 'refine,code'}
 
 # =============================================================================
+# Claude Agent Configuration
+# =============================================================================
+
+CLAUDE_AGENT=${e.CLAUDE_AGENT || ''}
+
+# =============================================================================
 # Recipe Lane Routing (status IDs from your board)
 # =============================================================================
 
 RUNNER_REFINE_FROM=${e.RUNNER_REFINE_FROM || ''}
 RUNNER_REFINE_TO=${e.RUNNER_REFINE_TO || ''}
+RUNNER_REFINE_AGENT=${e.RUNNER_REFINE_AGENT || ''}
 
 RUNNER_ARCHITECT_FROM=${e.RUNNER_ARCHITECT_FROM || ''}
 RUNNER_ARCHITECT_TO=${e.RUNNER_ARCHITECT_TO || ''}
+RUNNER_ARCHITECT_AGENT=${e.RUNNER_ARCHITECT_AGENT || ''}
 
 RUNNER_CODE_FROM=${e.RUNNER_CODE_FROM || ''}
 RUNNER_CODE_TO=${e.RUNNER_CODE_TO || ''}
+RUNNER_CODE_AGENT=${e.RUNNER_CODE_AGENT || ''}
 
 RUNNER_REVIEW_FROM=${e.RUNNER_REVIEW_FROM || ''}
 RUNNER_REVIEW_TO=${e.RUNNER_REVIEW_TO || ''}
+RUNNER_REVIEW_AGENT=${e.RUNNER_REVIEW_AGENT || ''}
 
 RUNNER_TRIAGE_FROM=${e.RUNNER_TRIAGE_FROM || ''}
 RUNNER_TRIAGE_TO=${e.RUNNER_TRIAGE_TO || ''}
+RUNNER_TRIAGE_AGENT=${e.RUNNER_TRIAGE_AGENT || ''}
 
 RUNNER_BOUNCE_FROM=${e.RUNNER_BOUNCE_FROM || ''}
 RUNNER_BOUNCE_TO=${e.RUNNER_BOUNCE_TO || ''}
@@ -598,6 +609,7 @@ RUNNER_MERGE_TO=${e.RUNNER_MERGE_TO || ''}
 
 RUNNER_DOCUMENTER_FROM=${e.RUNNER_DOCUMENTER_FROM || ''}
 RUNNER_DOCUMENTER_TO=${e.RUNNER_DOCUMENTER_TO || ''}
+RUNNER_DOCUMENTER_AGENT=${e.RUNNER_DOCUMENTER_AGENT || ''}
 
 MAX_BOUNCES=${e.MAX_BOUNCES || '3'}
 `;
