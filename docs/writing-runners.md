@@ -299,11 +299,17 @@ Replaces every `{{KEY1}}` in the template file with `value1`, and so on. Uses No
 For simpler runners, call Claude directly as shown in the skeleton. For runners that need rate-limit awareness, use `run_claude`:
 
 ```bash
-run_claude "$PROMPT_FILE" "$RESULT_FILE" "$WORKING_DIR"
+run_claude "$PROMPT_FILE" "$RESULT_FILE" "$WORKING_DIR" "$AGENT"
 # Returns: 0 = success, 1 = failure, 2 = rate limited
 ```
 
+The 4th argument is an optional agent name. When set, `--agent <name>` is appended to the `claude -p` invocation. Runners resolve the agent using `"${RUNNER_<NAME>_AGENT:-$CLAUDE_AGENT}"` — this uses the per-runner agent if configured, falling back to the global default. Pass `""` for the 3rd argument (working directory) if you don't need a custom working directory but do need to pass an agent.
+
+For runners that need temp file cleanup on failure, use `run_claude_safe` instead — it accepts the same arguments but removes prompt and result files when Claude returns non-zero.
+
 Check rate-limit status before starting a cycle with `is_rate_limited`.
+
+See [Custom Claude Agents](features/custom-agents.md) for full configuration details.
 
 ### Other Helpers
 
