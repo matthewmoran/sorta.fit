@@ -22,8 +22,10 @@ bash core/loop.sh
 bash runners/refine.sh
 bash runners/code.sh
 bash runners/review.sh
+bash runners/architect.sh
 bash runners/triage.sh
 bash runners/bounce.sh
+bash runners/documenter.sh
 bash runners/merge.sh
 
 # Generate release notes (manual, not part of the loop)

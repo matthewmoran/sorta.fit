@@ -38,25 +38,33 @@ Sorta.Fit/
   core/
     config.sh         # Loads .env, validates required vars, sets defaults
     utils.sh          # Logging, slugify, render_template, find_gh, lock files
-    runner.sh         # Main loop -- polls board, runs enabled recipes
+    loop.sh           # Main loop -- polls board, runs enabled runners
+    runner-lib.sh     # Shared functions used across runners
   adapters/
     jira.sh           # Jira Cloud adapter (implements board_* interface)
     jira.config.sh.example  # Status/transition IDs template for Jira
   prompts/
     refine.md         # Prompt template for card refinement
+    architect.md      # Prompt template for architecture planning
     code.md           # Prompt template for implementation
     review.md         # Prompt template for PR review
     triage.md         # Prompt template for bug triage
-  recipes/
+    documenter.md     # Prompt template for documentation generation
+  runners/
     refine.sh         # To Do -> Refined
+    architect.sh      # Refined -> Architected
     code.sh           # Agent -> branch -> PR -> QA
     review.sh         # QA -> PR review (card stays in QA)
     triage.sh         # Bug triage -> Refined
+    bounce.sh         # QA -> Agent (rejected PRs)
+    merge.sh          # QA -> Done (approved PRs)
+    documenter.sh     # Generates/updates docs, opens PR
     release-notes.sh  # Manual: generate changelog from merged commits
   setup/
     server.js         # Setup wizard HTTP server (port 3456)
     index.html        # Setup wizard GUI
   docs/               # Documentation
+    features/         # Auto-generated feature docs
   .env                # Your configuration (not committed)
   .env.example        # Template with all variables documented
 ```
@@ -88,7 +96,17 @@ Open `.env` in your editor and configure the following variables:
 | `POLL_INTERVAL` | `3600` | Seconds between polling cycles (3600 = 1 hour) |
 | `MAX_CARDS_REFINE` | `5` | Maximum cards to refine per cycle |
 | `MAX_CARDS_CODE` | `2` | Maximum cards to implement per cycle |
-| `RECIPES_ENABLED` | `refine,code` | Comma-separated list of recipes to run |
+| `RUNNERS_ENABLED` | `refine,code` | Comma-separated list of runners to run |
+| `TARGET_REPO` | (current git root) | Absolute path to the repository sorta.fit operates on |
+| `MERGE_STRATEGY` | `merge` | How to merge PRs: `merge`, `squash`, or `rebase` |
+| `GIT_RELEASE_BRANCH` | (empty) | Release branch for promotion PRs after merge |
+| `MAX_SKIP_RETRIES` | `3` | Extra batches to fetch if all cards in a batch are skipped |
+| `MAX_CARDS_ARCHITECT` | `5` | Maximum cards to architect per cycle |
+| `MAX_CARDS_BOUNCE` | `10` | Maximum cards to check for bounces per cycle |
+| `MAX_CARDS_MERGE` | `10` | Maximum cards to check for merge per cycle |
+| `MAX_CARDS_DOCUMENTER` | `5` | Maximum cards to document per cycle |
+| `DOCS_DIR` | `docs` | Target directory for generated documentation |
+| `DOCS_ORGANIZE_BY` | `feature` | How to organize generated doc files |
 | `BOARD_EMAIL` | (empty) | Your board account email (required for Jira) |
 
 ### Jira-Specific Notes
@@ -167,7 +185,7 @@ The GitHub CLI (`gh`) may not be on the Git Bash PATH. Sorta handles this automa
 Make the scripts executable:
 
 ```bash
-chmod +x core/*.sh adapters/*.sh recipes/*.sh setup.sh
+chmod +x core/*.sh adapters/*.sh runners/*.sh setup.sh
 ```
 
 No other platform-specific configuration is needed.
@@ -176,33 +194,37 @@ No other platform-specific configuration is needed.
 
 ### Full Runner (Polling Loop)
 
-Start the main runner, which polls the board and runs enabled recipes in a loop:
+Start the main loop, which polls the board and runs enabled runners in a loop:
 
 ```bash
-bash core/runner.sh
+bash core/loop.sh
 ```
 
-The runner will:
+The loop will:
 1. Validate all dependencies (preflight check)
-2. Run each enabled recipe once immediately
+2. Run each enabled runner once immediately
 3. Sleep for `POLL_INTERVAL` seconds
 4. Repeat
 
-Press Ctrl+C to stop. The runner uses a lock file (`.automation.lock`) to prevent overlapping cycles.
+Press Ctrl+C to stop. The loop uses a lock file (`.automation.lock`) to prevent overlapping cycles.
 
-### Single Recipe
+### Single Runner
 
-Run any recipe in isolation:
+Run any runner in isolation:
 
 ```bash
-bash recipes/refine.sh
-bash recipes/code.sh
-bash recipes/review.sh
-bash recipes/triage.sh
-bash recipes/release-notes.sh v1.0.0
+bash runners/refine.sh
+bash runners/architect.sh
+bash runners/code.sh
+bash runners/review.sh
+bash runners/triage.sh
+bash runners/bounce.sh
+bash runners/merge.sh
+bash runners/documenter.sh
+bash runners/release-notes.sh v1.0.0
 ```
 
-Each recipe sources the config, utils, and adapter on its own, so no prior setup is needed beyond a valid `.env` and adapter config.
+Each runner sources the config, utils, and adapter on its own, so no prior setup is needed beyond a valid `.env` and adapter config.
 
 ## Troubleshooting
 
@@ -212,7 +234,7 @@ Each recipe sources the config, utils, and adapter on its own, so no prior setup
 bash: ./core/runner.sh: Permission denied
 ```
 
-On macOS/Linux, make scripts executable: `chmod +x core/*.sh recipes/*.sh adapters/*.sh`. On Windows with Git Bash, use `bash core/runner.sh` (prefix with `bash`) instead of `./core/runner.sh`.
+On macOS/Linux, make scripts executable: `chmod +x core/*.sh runners/*.sh adapters/*.sh`. On Windows with Git Bash, use `bash core/loop.sh` (prefix with `bash`) instead of `./core/loop.sh`.
 
 ### Line Ending Errors
 
@@ -228,7 +250,7 @@ git rm --cached -r .
 git reset --hard
 ```
 
-Or convert a single file: `sed -i 's/\r$//' core/runner.sh`
+Or convert a single file: `sed -i 's/\r$//' core/loop.sh`
 
 ### Missing Dependencies
 
@@ -264,7 +286,7 @@ rm .automation.lock
 
 ### No Cards Found
 
-If recipes report "No cards in [lane]" but you see cards on your board:
+If runners report "No cards in [lane]" but you see cards on your board:
 - Verify the status names in your adapter config match exactly (case-sensitive).
 - Run `board_discover` to confirm the correct status IDs.
 - Ensure the cards are in the correct project (`BOARD_PROJECT_KEY`).

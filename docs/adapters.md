@@ -1,6 +1,6 @@
 # Sorta.Fit -- Adapters
 
-Adapters are the bridge between Sorta and your issue board. Each adapter implements a standard set of `board_*` functions that the recipes call to read cards, update descriptions, post comments, and transition cards between lanes.
+Adapters are the bridge between Sorta and your issue board. Each adapter implements a standard set of `board_*` functions that the runners call to read cards, update descriptions, post comments, and transition cards between lanes.
 
 ## How Adapters Are Loaded
 
@@ -14,7 +14,7 @@ If the adapter config file does not exist, a warning is printed directing you to
 
 ## The board_* Interface
 
-Every adapter must implement the following functions. Recipes depend on these exact function names and signatures.
+Every adapter must implement the following functions. Runners depend on these exact function names and signatures.
 
 ### board_get_cards_in_status
 
@@ -175,33 +175,42 @@ Each adapter has a config file that maps your board's workflow to Sorta's lane m
 
 ### Status Variables
 
-Used by recipes to query cards in specific lanes:
+Used by runners to query cards in specific lanes. Variables use the pattern `STATUS_<id>` where `<id>` is the board's numeric status ID:
 
-| Variable | Purpose |
-|----------|---------|
-| `STATUS_TODO` | Cards awaiting refinement |
-| `STATUS_REFINED` | Refined cards ready for implementation |
-| `STATUS_AGENT` | Cards assigned to the AI agent |
-| `STATUS_IN_PROGRESS` | Cards being worked on (manual) |
-| `STATUS_QA` | Cards awaiting review |
-| `STATUS_DONE` | Completed cards |
-| `STATUS_BACKLOG` | Backlog cards |
+| Pattern | Example | Purpose |
+|---------|---------|---------|
+| `STATUS_<id>="Display Name"` | `STATUS_10000="To Do"` | Maps a status ID to its human-readable name |
+
+Define one variable per status in your workflow. The IDs come from `board_discover` output. Example from `jira.config.sh.example`:
+
+```bash
+STATUS_10000="To Do"
+STATUS_10070="Refined"
+STATUS_10069="Agent"
+STATUS_10001="In Progress"
+STATUS_10036="QA"
+STATUS_10002="Done"
+```
 
 ### Transition Variables
 
-Used by recipes to move cards between lanes:
+Used by runners to move cards between lanes. Variables use the pattern `TRANSITION_TO_<statusId>` where `<statusId>` is the target status ID:
 
-| Variable | Purpose |
-|----------|---------|
-| `TRANSITION_TODO` | Move card to To Do |
-| `TRANSITION_REFINED` | Move card to Refined |
-| `TRANSITION_AGENT` | Move card to Agent |
-| `TRANSITION_IN_PROGRESS` | Move card to In Progress |
-| `TRANSITION_QA` | Move card to QA |
-| `TRANSITION_BACKLOG` | Move card to Backlog |
-| `TRANSITION_DONE` | Move card to Done |
+| Pattern | Example | Purpose |
+|---------|---------|---------|
+| `TRANSITION_TO_<statusId>=<transitionId>` | `TRANSITION_TO_10070=5` | Maps a target status ID to the transition ID needed to reach it |
 
-Not all variables are required. Only define the ones your recipes use. At minimum, `STATUS_TODO`, `STATUS_AGENT`, `STATUS_QA`, `TRANSITION_REFINED`, and `TRANSITION_QA` are needed for the default `refine` and `code` recipes.
+Define one variable per transition your workflow uses. Example:
+
+```bash
+TRANSITION_TO_10000=11
+TRANSITION_TO_10070=5
+TRANSITION_TO_10069=4
+TRANSITION_TO_10036=3
+TRANSITION_TO_10002=31
+```
+
+Not all statuses and transitions are required. Only define the ones your runners use. At minimum, you need the statuses and transitions for the lanes your enabled runners read from and write to.
 
 ## Writing a New Adapter
 
@@ -252,9 +261,15 @@ Create `adapters/{name}.config.sh.example` with placeholder values and comments 
 # {Name} adapter configuration
 # Run board_discover to find these values for your project
 
-STATUS_TODO=your_todo_status_id
-STATUS_REFINED=your_refined_status_id
-# ... etc
+# Status ID → display name
+STATUS_10000="To Do"
+STATUS_10070="Refined"
+# ... add your project's status IDs
+
+# How to transition a card TO each status
+TRANSITION_TO_10000=11
+TRANSITION_TO_10070=5
+# ... add your project's transition IDs
 ```
 
 ### Step 5: Test with board_discover
@@ -280,12 +295,12 @@ board_get_card_title "PROJ-1"
 board_get_card_description "PROJ-1"
 ```
 
-### Step 6: Run a Recipe
+### Step 6: Run a Runner
 
-Test end-to-end with a single recipe against a test project:
+Test end-to-end with a single runner against a test project:
 
 ```bash
-bash recipes/refine.sh
+bash runners/refine.sh
 ```
 
 ## Reference: Jira Adapter
