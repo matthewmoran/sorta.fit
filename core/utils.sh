@@ -243,21 +243,26 @@ render_template() {
     return 1
   fi
 
-  local content
-  content=$(cat "$template_file")
+  local content_file value_file
+  content_file=$(mktemp)
+  value_file=$(mktemp)
+  cp "$template_file" "$content_file"
 
   while [[ $# -ge 2 ]]; do
     local key="$1"
     local value="$2"
     shift 2
-    # Use node for safe replacement (handles special chars)
-    content=$(node -e "
-      const content = process.argv[1];
+    # Use temp files to avoid shell expansion of content with metacharacters
+    printf '%s' "$value" > "$value_file"
+    node -e "
+      const fs = require('fs');
+      const content = fs.readFileSync(process.argv[1], 'utf8');
       const key = process.argv[2];
-      const value = process.argv[3];
-      console.log(content.split('{{' + key + '}}').join(value));
-    " "$content" "$key" "$value")
+      const value = fs.readFileSync(process.argv[3], 'utf8');
+      fs.writeFileSync(process.argv[1], content.split('{{' + key + '}}').join(value));
+    " "$content_file" "$key" "$value_file"
   done
 
-  echo "$content"
+  cat "$content_file"
+  rm -f "$content_file" "$value_file"
 }

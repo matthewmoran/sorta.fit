@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="session-token" content="{{SESSION_TOKEN}}">
 <title>Sorta.Fit - Setup Wizard</title>
 <style>
 *, *::before, *::after {
@@ -761,9 +762,10 @@ select option:disabled {
   }
 
   async function apiPost(url, data) {
+    var token = document.querySelector('meta[name="session-token"]').content;
     var resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
       body: JSON.stringify(data || {})
     });
     if (!resp.ok) {

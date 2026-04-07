@@ -5,11 +5,13 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync, spawn } = require('child_process');
 const os = require('os');
 const url = require('url');
 
 const PORT = 3456;
+const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
 const SETUP_DIR = __dirname;
 const PROJECT_ROOT = path.resolve(SETUP_DIR, '..');
 
@@ -114,6 +116,47 @@ function openBrowser(url) {
   } catch {
     // Silently ignore — user can open browser manually
   }
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────
+
+function requireAuth(req) {
+  const token = req.headers['x-session-token'];
+  if (!token || typeof token !== 'string') return false;
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(SESSION_TOKEN);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+// ─── Environment allowlist for runner child processes ───────────────
+
+const ENV_PASSTHROUGH_PREFIXES = ['BOARD_', 'GIT_', 'CLAUDE_', 'RUNNER_', 'MAX_CARDS_', 'MAX_BOUNCES'];
+const ENV_PASSTHROUGH_EXACT = [
+  'PATH', 'HOME', 'USER', 'LANG', 'TERM',
+  'POLL_INTERVAL', 'RUNNERS_ENABLED', 'MERGE_STRATEGY',
+  'TARGET_REPO', 'DOCS_DIR', 'DOCS_ORGANIZE_BY',
+];
+
+function buildRunnerEnv() {
+  const env = {};
+  for (const key of Object.keys(process.env)) {
+    if (ENV_PASSTHROUGH_EXACT.includes(key)) {
+      env[key] = process.env[key];
+      continue;
+    }
+    for (const prefix of ENV_PASSTHROUGH_PREFIXES) {
+      if (key.startsWith(prefix)) {
+        env[key] = process.env[key];
+        break;
+      }
+    }
+  }
+  return env;
 }
 
 // ─── API Handlers ───────────────────────────────────────────────────
@@ -635,6 +678,9 @@ async function handleStartRunner(req, res) {
     // Write runner output to a log file so we can track it
     const logPath = path.join(PROJECT_ROOT, 'runner.log');
     const logFd = fs.openSync(logPath, 'a');
+    if (process.platform !== 'win32') {
+      fs.chmodSync(logPath, 0o600);
+    }
 
     const background = body && body.background === true;
 
@@ -643,7 +689,7 @@ async function handleStartRunner(req, res) {
       runnerProcess = spawn('bash', [runnerScript], {
         cwd: cwd,
         stdio: ['ignore', logFd, logFd],
-        env: { ...process.env },
+        env: buildRunnerEnv(),
         windowsHide: true,
       });
     } else if (process.platform === 'win32') {
@@ -659,14 +705,14 @@ async function handleStartRunner(req, res) {
       if (gitBash) {
         runnerProcess = spawn(gitBash, ['--cd=' + PROJECT_ROOT, '-c', 'bash core/loop.sh; read -p "Runner exited. Press Enter to close."'], {
           stdio: 'ignore',
-          env: { ...process.env },
+          env: buildRunnerEnv(),
         });
       } else {
         // Fallback: run in background if git-bash not found
         runnerProcess = spawn('bash', [runnerScript], {
           cwd: cwd,
           stdio: ['ignore', logFd, logFd],
-          env: { ...process.env },
+          env: buildRunnerEnv(),
           windowsHide: true,
         });
       }
@@ -675,7 +721,7 @@ async function handleStartRunner(req, res) {
       runnerProcess = spawn('bash', [runnerScript], {
         cwd: cwd,
         stdio: ['ignore', logFd, logFd],
-        env: { ...process.env },
+        env: buildRunnerEnv(),
       });
     }
 
@@ -801,6 +847,10 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 405, { error: 'Method not allowed — use POST' });
     }
 
+    if (!requireAuth(req)) {
+      return sendJSON(res, 401, { error: 'Unauthorized — provide X-Session-Token header' });
+    }
+
     const handler = API_ROUTES[pathname];
     if (!handler) {
       return sendJSON(res, 404, { error: `Unknown API endpoint: ${pathname}` });
@@ -836,6 +886,23 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 403, { error: 'Forbidden' });
   }
 
+  // Inject session token into index.html so the frontend can authenticate
+  if (resolvedPath === path.resolve(SETUP_DIR, 'index.html')) {
+    fs.readFile(resolvedPath, 'utf-8', (err, html) => {
+      if (err) {
+        return sendJSON(res, 500, { error: 'Failed to read index.html' });
+      }
+      const injected = html.replace('{{SESSION_TOKEN}}', SESSION_TOKEN);
+      res.writeHead(200, {
+        ...corsHeaders(),
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': Buffer.byteLength(injected),
+      });
+      res.end(injected);
+    });
+    return;
+  }
+
   serveStaticFile(req, res, resolvedPath);
 });
 
@@ -869,10 +936,12 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  const url = `http://localhost:${PORT}`;
-  console.log(`Sorta.Fit setup wizard running at ${url}`);
+  const wizardUrl = `http://localhost:${PORT}`;
+  console.log(`Sorta.Fit setup wizard running at ${wizardUrl}`);
+  console.log(`Session token: ${SESSION_TOKEN}`);
+  console.log('(Token is injected into the page automatically — no copy-paste needed)');
   console.log('Press Ctrl+C to stop.\n');
-  openBrowser(url);
+  openBrowser(wizardUrl);
 });
 
 // Graceful shutdown

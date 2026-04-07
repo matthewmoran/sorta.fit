@@ -25,7 +25,7 @@ Board API tokens (e.g., Jira personal access tokens) are stored in the `.env` fi
 
 The setup wizard (`setup/server.js`) handles credentials in its `/api/test-connection` and `/api/save-config` endpoints. Credentials are received over HTTP from the browser, used for a single API call, and written to `.env`. The wizard binds to `127.0.0.1` only --- it is not reachable from other machines.
 
-> **Note:** The wizard does not currently implement authentication on its own API endpoints. On shared machines, any local user could call `http://localhost:3456/api/load-config` to read the saved configuration. If the wizard will run on multi-user hosts, a session token or single-use auth mechanism should be added.
+All API endpoints require a session token (`X-Session-Token` header). A cryptographically random 256-bit token is generated on each wizard startup using `crypto.randomBytes(32)` and compared using `crypto.timingSafeEqual()` to prevent timing attacks. The token is printed to the terminal on startup and injected into the served HTML page automatically, so no manual copy-paste is needed. Unauthenticated requests to any `/api/*` endpoint receive a `401 Unauthorized` response.
 
 ## Input Validation
 
@@ -56,7 +56,7 @@ The `/api/save-config` endpoint validates the adapter name with `/^[a-z][a-z0-9-
 
 Runners and utilities create temporary files via `mktemp` for prompt content, Claude output, and API payloads. These files may contain card descriptions, implementation plans, or API response data. On most systems, `mktemp` creates files with mode `0600` by default (owner-read/write only), but this depends on the system's `umask`.
 
-For defense-in-depth, callers should set restrictive permissions explicitly or ensure `umask 077` is active during runner execution.
+`core/loop.sh` sets `umask 077` at startup, immediately after `set -euo pipefail`. All temp files, logs, and lock directories created by runners during the polling cycle inherit restrictive permissions (`0700` for directories, `0600` for files) regardless of the system default.
 
 Files created by runners:
 | Runner | Temp files | Contents |
@@ -72,11 +72,7 @@ All temp files are cleaned up with `rm -f` after use, including in error paths.
 
 ### Log Files
 
-The setup wizard writes runner output to `runner.log` in the project root via `fs.openSync(logPath, 'a')`. This log may contain board data echoed by runner scripts. The log file inherits default permissions from the OS; on shared systems, restrict it:
-
-```bash
-chmod 600 runner.log
-```
+The setup wizard writes runner output to `runner.log` in the project root via `fs.openSync(logPath, 'a')`. This log may contain board data echoed by runner scripts. On Unix-like systems, the wizard automatically sets the log file to mode `0600` (owner-read/write only) via `fs.chmodSync()` after opening. On Windows, NTFS ACLs provide per-user isolation by default.
 
 ### Lock Files
 
@@ -105,13 +101,15 @@ Runners never check out `main`, `master`, `dev`, or `develop`. All AI-created br
 
 ### Environment Passthrough
 
-The setup wizard spawns runner processes with `{ ...process.env }`, passing the full parent environment. This means any environment variables set in the wizard's process (including credentials loaded into memory) are inherited by child processes. This is functional but broad --- in hardened deployments, the spawn call should pass only the variables runners actually need (`BOARD_*`, `GIT_*`, `POLL_INTERVAL`, etc.).
+The setup wizard spawns runner processes with a restricted environment built by `buildRunnerEnv()`. Only allowlisted variables are passed to child processes: keys matching specific prefixes (`BOARD_*`, `GIT_*`, `CLAUDE_*`, `RUNNER_*`, `MAX_CARDS_*`, `MAX_BOUNCES`) and exact names (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `POLL_INTERVAL`, `RUNNERS_ENABLED`, `MERGE_STRATEGY`, `TARGET_REPO`, `DOCS_DIR`, `DOCS_ORGANIZE_BY`). This prevents unintended credential leakage from the parent process environment.
 
 ## Checklist for Operators
 
 - [ ] Set `chmod 600 .env` after creating or editing the file (macOS/Linux)
 - [ ] Verify `.env` is listed in `.gitignore` (it is by default)
 - [ ] Audit git history for accidentally committed secrets before making the repo public (`git log --all -p -- .env`)
-- [ ] If running the setup wizard on a shared machine, restrict access to port 3456 or add authentication
-- [ ] Review `runner.log` permissions if the setup wizard is used to start runners
+- [x] Setup wizard API endpoints require a session token (enforced in code)
+- [x] `runner.log` is created with `0600` permissions on Unix (enforced in code)
+- [x] Runner child processes receive only allowlisted environment variables (enforced in code)
+- [x] `umask 077` is set in `core/loop.sh` for all runner temp files (enforced in code)
 - [ ] Rotate board API tokens periodically; revoke any tokens found in git history
