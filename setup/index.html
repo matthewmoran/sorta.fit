@@ -1529,16 +1529,18 @@ select option:disabled {
         env["RUNNER_" + upper + "_AGENT"] = route.agent || "";
       }
 
-      // Build adapter config
+      // Build adapter config (sanitize IDs for bash-safe variable names)
       var adapterConfig = {};
       for (var s = 0; s < state.discoveredStatuses.length; s++) {
         var status = state.discoveredStatuses[s];
-        adapterConfig["STATUS_" + status.id] = status.name;
+        var safeId = status.id.replace(/[^a-zA-Z0-9_]/g, '_');
+        adapterConfig["STATUS_" + safeId] = status.name;
       }
       for (var t = 0; t < state.discoveredTransitions.length; t++) {
         var trans = state.discoveredTransitions[t];
         if (trans.toId && trans.id) {
-          adapterConfig["TRANSITION_TO_" + trans.toId] = trans.id;
+          var safeTo = trans.toId.replace(/[^a-zA-Z0-9_]/g, '_');
+          adapterConfig["TRANSITION_TO_" + safeTo] = trans.id;
         }
       }
 

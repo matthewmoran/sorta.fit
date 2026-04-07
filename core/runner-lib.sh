@@ -18,7 +18,9 @@ runner_transition() {
     return 0
   fi
 
-  local transition_var="TRANSITION_TO_${target_status}"
+  # Sanitize status ID for bash variable name (replace non-alphanumeric with _)
+  local safe_status="${target_status//[^a-zA-Z0-9_]/_}"
+  local transition_var="TRANSITION_TO_${safe_status}"
   if [[ -n "${!transition_var:-}" ]]; then
     board_transition "$issue_key" "${!transition_var}"
     log_info "Done: $issue_key $verb and moved to $target_status"

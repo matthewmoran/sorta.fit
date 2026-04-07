@@ -68,6 +68,41 @@ function readBody(req) {
   });
 }
 
+function httpsRequest(opts, payload) {
+  const https = require('https');
+  return new Promise((resolve, reject) => {
+    if (payload) {
+      opts.headers = opts.headers || {};
+      opts.headers['Content-Length'] = Buffer.byteLength(payload);
+    }
+
+    const request = https.request(opts, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf-8');
+        try {
+          resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+        } catch {
+          resolve({ statusCode: response.statusCode, data: raw });
+        }
+      });
+    });
+
+    request.on('error', reject);
+    request.setTimeout(15000, () => {
+      request.destroy();
+      reject(new Error('Request timed out'));
+    });
+
+    if (payload) {
+      request.end(payload);
+    } else {
+      request.end();
+    }
+  });
+}
+
 function whichCommand(name) {
   try {
     const cmd = process.platform === 'win32' ? `where ${name}` : `which ${name}`;
@@ -344,44 +379,19 @@ async function handleTestConnection(req, res) {
     }
   } else if (adapter === 'linear') {
     try {
-      const https = require('https');
-      const payload = JSON.stringify({
-        query: '{ viewer { id name email } }',
-      });
+      const payload = JSON.stringify({ query: '{ viewer { id name email } }' });
+      const linearHost = domain || 'api.linear.app';
 
-      const result = await new Promise((resolve, reject) => {
-        const reqOpts = {
-          hostname: 'api.linear.app',
-          port: 443,
-          path: '/graphql',
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload),
-          },
-        };
-
-        const request = https.request(reqOpts, (response) => {
-          const chunks = [];
-          response.on('data', (chunk) => chunks.push(chunk));
-          response.on('end', () => {
-            const raw = Buffer.concat(chunks).toString('utf-8');
-            try {
-              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
-            } catch {
-              resolve({ statusCode: response.statusCode, data: raw });
-            }
-          });
-        });
-
-        request.on('error', reject);
-        request.setTimeout(15000, () => {
-          request.destroy();
-          reject(new Error('Request timed out'));
-        });
-        request.end(payload);
-      });
+      const result = await httpsRequest({
+        hostname: linearHost,
+        port: 443,
+        path: '/graphql',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }, payload);
 
       if (result.statusCode === 200 && result.data && result.data.data && result.data.data.viewer && result.data.data.viewer.name) {
         sendJSON(res, 200, {
@@ -404,43 +414,21 @@ async function handleTestConnection(req, res) {
     }
   } else if (adapter === 'github-issues') {
     try {
-      const https = require('https');
       const repoPath = projectKey || '';
-      const apiPath = `/repos/${repoPath}`;
+      const ghHost = domain === 'github.com' ? 'api.github.com' : (domain || 'api.github.com');
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'SortaFit-Setup',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
+      if (token) headers['Authorization'] = `token ${token}`;
 
-      const result = await new Promise((resolve, reject) => {
-        const reqOpts = {
-          hostname: 'api.github.com',
-          port: 443,
-          path: apiPath,
-          method: 'GET',
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'SortaFit-Setup',
-            'X-GitHub-Api-Version': '2022-11-28',
-          },
-        };
-
-        const request = https.request(reqOpts, (response) => {
-          const chunks = [];
-          response.on('data', (chunk) => chunks.push(chunk));
-          response.on('end', () => {
-            const raw = Buffer.concat(chunks).toString('utf-8');
-            try {
-              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
-            } catch {
-              resolve({ statusCode: response.statusCode, data: raw });
-            }
-          });
-        });
-
-        request.on('error', reject);
-        request.setTimeout(15000, () => {
-          request.destroy();
-          reject(new Error('Request timed out'));
-        });
-        request.end();
+      const result = await httpsRequest({
+        hostname: ghHost,
+        port: 443,
+        path: `/repos/${repoPath}`,
+        method: 'GET',
+        headers,
       });
 
       if (result.statusCode === 200 && result.data && result.data.full_name) {
@@ -615,43 +603,20 @@ async function handleDiscoverBoard(req, res) {
       sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
     }
   } else if (adapter === 'linear') {
-    const https = require('https');
+    const linearHost = domain || 'api.linear.app';
 
     function linearPost(query) {
-      return new Promise((resolve, reject) => {
-        const payload = JSON.stringify({ query });
-        const reqOpts = {
-          hostname: 'api.linear.app',
-          port: 443,
-          path: '/graphql',
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload),
-          },
-        };
-
-        const request = https.request(reqOpts, (response) => {
-          const chunks = [];
-          response.on('data', (chunk) => chunks.push(chunk));
-          response.on('end', () => {
-            const raw = Buffer.concat(chunks).toString('utf-8');
-            try {
-              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
-            } catch {
-              resolve({ statusCode: response.statusCode, data: raw });
-            }
-          });
-        });
-
-        request.on('error', reject);
-        request.setTimeout(15000, () => {
-          request.destroy();
-          reject(new Error('Request timed out'));
-        });
-        request.end(payload);
-      });
+      const payload = JSON.stringify({ query });
+      return httpsRequest({
+        hostname: linearHost,
+        port: 443,
+        path: '/graphql',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }, payload);
     }
 
     try {
@@ -685,42 +650,21 @@ async function handleDiscoverBoard(req, res) {
       sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
     }
   } else if (adapter === 'github-issues') {
-    const https = require('https');
+    const ghHost = domain === 'github.com' ? 'api.github.com' : (domain || 'api.github.com');
+    const ghHeaders = {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'SortaFit-Setup',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (token) ghHeaders['Authorization'] = `token ${token}`;
 
     function githubGet(apiPath) {
-      return new Promise((resolve, reject) => {
-        const reqOpts = {
-          hostname: 'api.github.com',
-          port: 443,
-          path: apiPath,
-          method: 'GET',
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'SortaFit-Setup',
-            'X-GitHub-Api-Version': '2022-11-28',
-          },
-        };
-
-        const request = https.request(reqOpts, (response) => {
-          const chunks = [];
-          response.on('data', (chunk) => chunks.push(chunk));
-          response.on('end', () => {
-            const raw = Buffer.concat(chunks).toString('utf-8');
-            try {
-              resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
-            } catch {
-              resolve({ statusCode: response.statusCode, data: raw });
-            }
-          });
-        });
-
-        request.on('error', reject);
-        request.setTimeout(15000, () => {
-          request.destroy();
-          reject(new Error('Request timed out'));
-        });
-        request.end();
+      return httpsRequest({
+        hostname: ghHost,
+        port: 443,
+        path: apiPath,
+        method: 'GET',
+        headers: ghHeaders,
       });
     }
 

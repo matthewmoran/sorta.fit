@@ -5,24 +5,30 @@
 #
 # GitHub Issues uses labels with a "status:" prefix for lane mapping.
 # Create labels like: status:todo, status:refined, status:in-progress, status:qa, status:done
-# Status IDs are the full label names (e.g., "status:todo")
-# Transition IDs are also label names (label swap removes old status label, adds new one)
+#
+# IMPORTANT: Bash variable names cannot contain colons or hyphens.
+# Config keys use underscores in place of special characters (e.g., status:todo becomes status_todo).
+# Config values use the real label names (for API calls).
+# The board_discover command outputs both forms for easy copy-paste.
 
-# Status label → display name
-STATUS_status:todo="To Do"
-STATUS_status:refined="Refined"
-STATUS_status:agent="Agent"
-STATUS_status:in-progress="In Progress"
-STATUS_status:qa="QA"
-STATUS_status:done="Done"
-STATUS_status:backlog="Backlog"
+# Status label (sanitized key) → display name
+# Key: label name with special chars replaced by underscores
+# Value: human-readable display name
+STATUS_status_todo="To Do"
+STATUS_status_refined="Refined"
+STATUS_status_agent="Agent"
+STATUS_status_in_progress="In Progress"
+STATUS_status_qa="QA"
+STATUS_status_done="Done"
+STATUS_status_backlog="Backlog"
 
 # How to transition a card TO each status
-# For GitHub Issues, the transition ID is the target label name itself
-TRANSITION_TO_status:todo=status:todo
-TRANSITION_TO_status:refined=status:refined
-TRANSITION_TO_status:agent=status:agent
-TRANSITION_TO_status:in-progress=status:in-progress
-TRANSITION_TO_status:qa=status:qa
-TRANSITION_TO_status:done=status:done
-TRANSITION_TO_status:backlog=status:backlog
+# Key: sanitized label name (colons/hyphens replaced with underscores)
+# Value: real label name (used in GitHub API calls)
+TRANSITION_TO_status_todo=status:todo
+TRANSITION_TO_status_refined=status:refined
+TRANSITION_TO_status_agent=status:agent
+TRANSITION_TO_status_in_progress=status:in-progress
+TRANSITION_TO_status_qa=status:qa
+TRANSITION_TO_status_done=status:done
+TRANSITION_TO_status_backlog=status:backlog

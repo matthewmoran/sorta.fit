@@ -230,17 +230,25 @@ board_transition() {
   local num
   num=$(gh_issue_number "$issue_key")
 
-  # Get current labels and remove any existing status: labels
+  # Get current labels and remove any existing status: labels, then add the target
   local response
   response=$(github_api "GET" "/repos/${GH_REPO}/issues/${num}") || return 1
+
+  local tid_file
+  tid_file=$(mktemp)
+  printf '%s' "$transition_id" > "$tid_file"
+
   local current_labels
   current_labels=$(echo "$response" | node -e "
+    const fs=require('fs');
+    const tid=fs.readFileSync(process.argv[1],'utf8');
     let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
       const j=JSON.parse(d);
       const labels=(j.labels||[]).map(l=>l.name).filter(n=>!n.startsWith('status:'));
-      labels.push('$transition_id');
+      labels.push(tid);
       console.log(JSON.stringify(labels));
-    });")
+    });" "$tid_file")
+  rm -f "$tid_file"
 
   # Set the new label set (removes old status labels, adds new one)
   local payload
@@ -267,12 +275,18 @@ board_discover() {
         j.forEach(l=>console.log(' ',l.name,'-',l.description||'(no description)'));
         return;
       }
-      statusLabels.forEach(l=>console.log(l.name,'-',l.description||l.name.replace('status:','')));
+      statusLabels.forEach(l=>{
+        const safe=l.name.replace(/[^a-zA-Z0-9_]/g,'_');
+        const display=l.description||l.name.replace('status:','');
+        console.log(l.name,'-',display);
+        console.log('  Config key: STATUS_'+safe+'=\"'+display+'\"');
+        console.log('  Transition: TRANSITION_TO_'+safe+'='+l.name);
+      });
     });"
 
   echo ""
   echo "=== Transitions ==="
   echo "GitHub Issues uses label swaps for transitions."
-  echo "Set TRANSITION_TO_<label>=<label> (the transition ID is the target status label itself)."
-  echo "Example: TRANSITION_TO_status:refined=status:refined"
+  echo "Config keys use underscores (bash-safe). Config values use real label names."
+  echo "RUNNER_*_FROM and RUNNER_*_TO in .env use the real label names (e.g., status:todo)."
 }

@@ -69,30 +69,13 @@ linear_graphql() {
 # Helper: look up a Linear issue's internal UUID from its identifier (e.g., TEAM-123)
 linear_resolve_id() {
   local issue_key="$1"
-  local response
-  response=$(linear_graphql "query { issueVcSearch(term: \"$issue_key\", first: 1) { nodes { id identifier } } }") 2>/dev/null || true
-
-  # Try the search approach first, fall back to filter-based lookup
-  local resolved_id
-  resolved_id=$(echo "$response" | node -e "
-    let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-      try {
-        const j=JSON.parse(d);
-        const nodes = j.data && j.data.issueVcSearch && j.data.issueVcSearch.nodes;
-        if(nodes && nodes.length > 0) { console.log(nodes[0].id); return; }
-      } catch(e) {}
-      console.log('');
-    });" 2>/dev/null) || true
-
-  if [[ -n "$resolved_id" ]]; then
-    printf '%s' "$resolved_id"
-    return 0
-  fi
-
-  # Fallback: query by identifier using issue filter
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { id } } }") || return 1
+
+  local response
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { id } } }' \
+    "{\"teamKey\":\"$BOARD_PROJECT_KEY\",\"num\":$num}") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.data.issues.nodes[0])console.log(j.data.issues.nodes[0].id);})"
 }
 
@@ -105,13 +88,26 @@ board_get_cards_in_status() {
     return 1
   fi
 
-  local cursor_arg=""
   if [[ "$start_at" -gt 0 ]]; then
-    # For pagination, we need to fetch and skip; Linear uses cursor-based pagination
-    # We pass start_at as a skip count by fetching start_at+max and discarding the first start_at
     local fetch_count=$((start_at + max))
+    local vars_file
+    vars_file=$(mktemp)
+    node -e "
+      const fs = require('fs');
+      fs.writeFileSync(process.argv[1], JSON.stringify({
+        teamKey: process.argv[2],
+        stateId: process.argv[3],
+        count: parseInt(process.argv[4], 10)
+      }));
+    " "$vars_file" "$BOARD_PROJECT_KEY" "$status" "$fetch_count"
+    local vars
+    vars=$(cat "$vars_file")
+    rm -f "$vars_file"
+
     local response
-    response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, state: { id: { eq: \"$status\" } } }, first: $fetch_count, orderBy: createdAt) { nodes { id } } }") || return 1
+    response=$(linear_graphql \
+      'query($teamKey: String!, $stateId: String!, $count: Int!) { issues(filter: { team: { key: { eq: $teamKey } }, state: { id: { eq: $stateId } } }, first: $count, orderBy: createdAt) { nodes { id } } }' \
+      "$vars") || return 1
     echo "$response" | node -e "
       let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
         const j=JSON.parse(d);
@@ -122,15 +118,40 @@ board_get_cards_in_status() {
     return 0
   fi
 
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "
+    const fs = require('fs');
+    fs.writeFileSync(process.argv[1], JSON.stringify({
+      teamKey: process.argv[2],
+      stateId: process.argv[3],
+      count: parseInt(process.argv[4], 10)
+    }));
+  " "$vars_file" "$BOARD_PROJECT_KEY" "$status" "$max"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, state: { id: { eq: \"$status\" } } }, first: $max, orderBy: createdAt) { nodes { id } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $stateId: String!, $count: Int!) { issues(filter: { team: { key: { eq: $teamKey } }, state: { id: { eq: $stateId } } }, first: $count, orderBy: createdAt) { nodes { id } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);(j.data.issues.nodes||[]).forEach(i=>console.log(i.id));})"
 }
 
 board_get_card_key() {
   local issue_id="$1"
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({id:process.argv[2]}));" "$vars_file" "$issue_id"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issue(id: \"$issue_id\") { identifier } }") || return 1
+  response=$(linear_graphql \
+    'query($id: String!) { issue(id: $id) { identifier } }' \
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.data.issue.identifier);})"
 }
 
@@ -138,8 +159,17 @@ board_get_card_summary() {
   local issue_key="$1"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { identifier title state { name } priority priorityLabel labels { nodes { name } } } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { identifier title state { name } priority priorityLabel labels { nodes { name } } } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "
     let d='';
     process.stdin.on('data',c=>d+=c);
@@ -160,8 +190,17 @@ board_get_card_title() {
   local issue_key="$1"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { title } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { title } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];console.log(i?i.title:'');})"
 }
 
@@ -169,8 +208,17 @@ board_get_card_type() {
   local issue_key="$1"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { labels { nodes { name } } } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { labels { nodes { name } } } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];const l=(i&&i.labels&&i.labels.nodes&&i.labels.nodes[0]);console.log(l?l.name:'Issue');})"
 }
 
@@ -178,8 +226,17 @@ board_get_card_description() {
   local issue_key="$1"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { description } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { description } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];console.log(i&&i.description?i.description:'');})"
 }
 
@@ -187,8 +244,17 @@ board_get_card_comments() {
   local issue_key="$1"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { issues(filter: { team: { key: { eq: \"$BOARD_PROJECT_KEY\" } }, number: { eq: $num } }, first: 1) { nodes { comments { nodes { body user { displayName } createdAt } } } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { comments { nodes { body user { displayName } createdAt } } } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "
     let d='';
     process.stdin.on('data',c=>d+=c);
@@ -220,11 +286,21 @@ board_update_description() {
   tmpfile=$(mktemp)
   printf '%s' "$markdown" > "$tmpfile"
 
-  local escaped_md
-  escaped_md=$(node -e "const fs=require('fs');const md=fs.readFileSync(process.argv[1],'utf8');process.stdout.write(JSON.stringify(md));" "$tmpfile")
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "
+    const fs=require('fs');
+    const md=fs.readFileSync(process.argv[1],'utf8');
+    fs.writeFileSync(process.argv[2],JSON.stringify({id:process.argv[3],desc:md}));
+  " "$tmpfile" "$vars_file" "$issue_id"
   rm -f "$tmpfile"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
 
-  linear_graphql "mutation { issueUpdate(id: \"$issue_id\", input: { description: $escaped_md }) { success } }" > /dev/null
+  linear_graphql \
+    'mutation($id: String!, $desc: String!) { issueUpdate(id: $id, input: { description: $desc }) { success } }' \
+    "$vars" > /dev/null
 }
 
 board_add_comment() {
@@ -242,11 +318,21 @@ board_add_comment() {
   tmpfile=$(mktemp)
   printf '%s' "$comment" > "$tmpfile"
 
-  local escaped_comment
-  escaped_comment=$(node -e "const fs=require('fs');const c=fs.readFileSync(process.argv[1],'utf8');process.stdout.write(JSON.stringify(c));" "$tmpfile")
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "
+    const fs=require('fs');
+    const body=fs.readFileSync(process.argv[1],'utf8');
+    fs.writeFileSync(process.argv[2],JSON.stringify({issueId:process.argv[3],body:body}));
+  " "$tmpfile" "$vars_file" "$issue_id"
   rm -f "$tmpfile"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
 
-  linear_graphql "mutation { commentCreate(input: { issueId: \"$issue_id\", body: $escaped_comment }) { success } }" > /dev/null
+  linear_graphql \
+    'mutation($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }' \
+    "$vars" > /dev/null
 }
 
 board_transition() {
@@ -260,14 +346,31 @@ board_transition() {
     return 1
   fi
 
-  # In Linear, transition_id is the target workflow state UUID
-  linear_graphql "mutation { issueUpdate(id: \"$issue_id\", input: { stateId: \"$transition_id\" }) { success } }" > /dev/null
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({id:process.argv[2],stateId:process.argv[3]}));" "$vars_file" "$issue_id" "$transition_id"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
+  linear_graphql \
+    'mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }' \
+    "$vars" > /dev/null
 }
 
 board_discover() {
   echo "=== Statuses (Workflow States) ==="
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2]}));" "$vars_file" "$BOARD_PROJECT_KEY"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
-  response=$(linear_graphql "query { teams(filter: { key: { eq: \"$BOARD_PROJECT_KEY\" } }) { nodes { states { nodes { id name type } } } } }") || return 1
+  response=$(linear_graphql \
+    'query($teamKey: String!) { teams(filter: { key: { eq: $teamKey } }) { nodes { states { nodes { id name type } } } } }' \
+    "$vars") || return 1
   echo "$response" | node -e "
     let d='';
     process.stdin.on('data',c=>d+=c);
@@ -276,11 +379,17 @@ board_discover() {
       const teams=j.data.teams.nodes||[];
       if(!teams.length){console.log('Team not found. Check BOARD_PROJECT_KEY.');return;}
       const states=teams[0].states.nodes||[];
-      states.forEach(s=>console.log(s.id,'-',s.name,'('+s.type+')'));
+      states.forEach(s=>{
+        const safe=s.id.replace(/[^a-zA-Z0-9_]/g,'_');
+        console.log(s.id,'-',s.name,'('+s.type+')');
+        console.log('  Config key: STATUS_'+safe+'=\"'+s.name+'\"');
+        console.log('  Transition: TRANSITION_TO_'+safe+'='+s.id);
+      });
     });"
 
   echo ""
   echo "=== Transitions ==="
   echo "Linear allows direct state-to-state transitions."
-  echo "Set TRANSITION_TO_<stateId>=<stateId> (the transition ID is the target state ID itself)."
+  echo "Use the config keys above. The TRANSITION_TO value is the real UUID (with hyphens)."
+  echo "RUNNER_*_FROM and RUNNER_*_TO in .env use the real UUID."
 }
