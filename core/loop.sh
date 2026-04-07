@@ -7,6 +7,12 @@ umask 077
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOCK_FILE="$SORTA_ROOT/.automation.lock"
+VALIDATE_MODE=0
+
+# Parse arguments
+if [[ "${1:-}" == "--validate" ]]; then
+  VALIDATE_MODE=1
+fi
 
 # Source config and utils
 source "$SCRIPT_DIR/config.sh"
@@ -20,9 +26,11 @@ if [[ ! -f "$ADAPTER_FILE" ]]; then
 fi
 source "$ADAPTER_FILE"
 
-# Cleanup on exit
+# Cleanup on exit (skip in validate mode — no lock acquired)
 cleanup() {
-  lock_release "$LOCK_FILE"
+  if [[ "$VALIDATE_MODE" -eq 0 ]]; then
+    lock_release "$LOCK_FILE"
+  fi
   log_info "Loop stopped."
 }
 trap cleanup EXIT INT TERM
@@ -44,6 +52,44 @@ echo ""
 
 # Preflight
 preflight_check || exit 1
+
+# Validate mode: check runner config and exit
+if [[ "$VALIDATE_MODE" -eq 1 ]]; then
+  log_step "Running validation checks..."
+  validation_failed=0
+
+  # Verify adapter config file exists
+  adapter_config="$SORTA_ROOT/adapters/${BOARD_ADAPTER}.config.sh"
+  if [[ ! -f "$adapter_config" ]]; then
+    log_error "Adapter config not found: $adapter_config"
+    validation_failed=1
+  fi
+
+  # Verify each enabled runner
+  for runner in "${RUNNER_LIST[@]}"; do
+    runner=$(echo "$runner" | xargs)
+    local_runner_file="$SORTA_ROOT/runners/${runner}.sh"
+
+    if [[ ! -f "$local_runner_file" ]]; then
+      log_error "Runner script not found: $local_runner_file"
+      validation_failed=1
+    fi
+
+    upper_runner=$(echo "$runner" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+    from_var="RUNNER_${upper_runner}_FROM"
+    if [[ -z "${!from_var:-}" ]]; then
+      log_warn "Runner '$runner': ${from_var} is not set — runner will not know which lane to read from"
+    fi
+  done
+
+  if [[ "$validation_failed" -eq 1 ]]; then
+    log_error "Validation failed."
+    exit 1
+  fi
+
+  log_info "Validation passed."
+  exit 0
+fi
 
 run_cycle() {
   if is_rate_limited; then
