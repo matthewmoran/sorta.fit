@@ -13,7 +13,7 @@ SINCE="${1:-}"
 OUTPUT_FILE="${2:-}"
 
 if [[ -z "$SINCE" ]]; then
-  echo "Usage: bash recipes/release-notes.sh <since> [output-file]"
+  echo "Usage: bash runners/release-notes.sh <since> [output-file]"
   echo "  since: git tag, date (YYYY-MM-DD), or commit SHA"
   exit 1
 fi

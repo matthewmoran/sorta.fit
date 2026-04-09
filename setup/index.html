@@ -396,17 +396,17 @@ select option:disabled {
   flex-shrink: 0;
 }
 
-.checkbox-item .recipe-info {
+.checkbox-item .runner-info {
   flex: 1;
 }
 
-.checkbox-item .recipe-name {
+.checkbox-item .runner-name {
   font-weight: 600;
   font-size: 14px;
   display: block;
 }
 
-.checkbox-item .recipe-desc {
+.checkbox-item .runner-desc {
   font-size: 12px;
   color: var(--text-muted);
   display: block;
@@ -716,7 +716,7 @@ select option:disabled {
       baseBranch: "main",
       pollInterval: 60,
       claudeAgent: "",
-      recipes: ["refine", "code"],
+      runners: ["refine", "code"],
       routing: {
         refine:    { fromId: "", toId: "", maxCards: 5, agent: "" },
         architect: { fromId: "", toId: "", maxCards: 5, agent: "" },
@@ -1097,8 +1097,8 @@ select option:disabled {
 
   // ---- Step 3: Select Runners ----
 
-  function renderSelectRecipes() {
-    var selected = state.config.recipes;
+  function renderSelectRunners() {
+    var selected = state.config.runners;
 
     var html = '<h2>Select Runners</h2>' +
       '<p>Choose which automation runners to enable. You\'ll configure their lanes and limits in the next step.</p>' +
@@ -1109,16 +1109,16 @@ select option:disabled {
       var checked = selected.indexOf(r.id) !== -1;
       html += '<div class="checkbox-item">' +
         '<input type="checkbox" value="' + r.id + '"' + (checked ? " checked" : "") +
-          ' onchange="window._wizToggleRecipe(\'' + r.id + '\', this.checked)" style="cursor:pointer" />' +
-        '<div class="recipe-info">' +
-          '<span class="recipe-name">' + escHtml(r.name) + '</span>' +
-          '<span class="recipe-desc">' + escHtml(r.desc) + '</span>' +
+          ' onchange="window._wizToggleRunner(\'' + r.id + '\', this.checked)" style="cursor:pointer" />' +
+        '<div class="runner-info">' +
+          '<span class="runner-name">' + escHtml(r.name) + '</span>' +
+          '<span class="runner-desc">' + escHtml(r.desc) + '</span>' +
         '</div>' +
       '</div>';
     }
 
     html += '</div>' +
-      '<div id="recipeSelectMsg" class="msg"></div>' +
+      '<div id="runnerSelectMsg" class="msg"></div>' +
       '<div class="btn-row">' +
         backBtn() +
         '<div class="btn-row-right">' +
@@ -1128,19 +1128,19 @@ select option:disabled {
     return html;
   }
 
-  window._wizToggleRecipe = function(id, checked) {
-    var idx = state.config.recipes.indexOf(id);
+  window._wizToggleRunner = function(id, checked) {
+    var idx = state.config.runners.indexOf(id);
     if (checked && idx === -1) {
-      state.config.recipes.push(id);
+      state.config.runners.push(id);
     } else if (!checked && idx !== -1) {
-      state.config.recipes.splice(idx, 1);
+      state.config.runners.splice(idx, 1);
     }
     renderCard();
   };
 
   window._wizNext3 = function() {
-    if (state.config.recipes.length === 0) {
-      showMsg("recipeSelectMsg", "error", "Please select at least one runner.");
+    if (state.config.runners.length === 0) {
+      showMsg("runnerSelectMsg", "error", "Please select at least one runner.");
       return;
     }
     goNext();
@@ -1180,23 +1180,23 @@ select option:disabled {
   }
 
   function renderPipeline() {
-    // Build the pipeline from the recipe routing, including human gates
-    var recipes = state.config.recipes;
+    // Build the pipeline from the runner routing, including human gates
+    var runners = state.config.runners;
     var routing = state.config.routing;
 
     // Define the main pipeline flow with human gates
     // Order: refine output -> human gate -> code input -> code output -> review -> human gate -> done
-    var steps = []; // { type: "status"|"human", id, label, recipe }
+    var steps = []; // { type: "status"|"human", id, label, runner }
 
-    // Build edges from active recipes
+    // Build edges from active runners
     var edges = [];
-    var recipeOrder = ["refine", "architect", "code", "review"];
-    for (var i = 0; i < recipeOrder.length; i++) {
-      var rid = recipeOrder[i];
-      if (recipes.indexOf(rid) === -1) continue;
+    var runnerOrder = ["refine", "architect", "code", "review"];
+    for (var i = 0; i < runnerOrder.length; i++) {
+      var rid = runnerOrder[i];
+      if (runners.indexOf(rid) === -1) continue;
       var route = routing[rid];
       if (route.fromId) {
-        edges.push({ from: route.fromId, to: route.toId, recipe: rid });
+        edges.push({ from: route.fromId, to: route.toId, runner: rid });
       }
     }
 
@@ -1214,7 +1214,7 @@ select option:disabled {
         steps.push({ type: "status", id: edge.from });
       }
 
-      steps.push({ type: "arrow", recipe: edge.recipe });
+      steps.push({ type: "arrow", runner: edge.runner });
 
       var toId = edge.to || edge.from; // review stays in same lane
       if (!seen[toId]) {
@@ -1226,7 +1226,7 @@ select option:disabled {
       if (ei < edges.length - 1) {
         var nextFrom = edges[ei + 1].from;
         if (toId !== nextFrom && !seen[nextFrom]) {
-          steps.push({ type: "arrow", recipe: "human" });
+          steps.push({ type: "arrow", runner: "human" });
           seen[nextFrom] = true;
           steps.push({ type: "status", id: nextFrom });
         }
@@ -1236,7 +1236,7 @@ select option:disabled {
     // Add final human gate to Done if we have a "Done" status discovered
     var doneId = findStatusIdByRole("DONE");
     if (doneId && !seen[doneId]) {
-      steps.push({ type: "arrow", recipe: "human" });
+      steps.push({ type: "arrow", runner: "human" });
       steps.push({ type: "status", id: doneId });
     }
 
@@ -1246,9 +1246,9 @@ select option:disabled {
       if (step.type === "status") {
         html += '<div class="pipeline-node active">' + escHtml(statusName(step.id)) + '</div>';
       } else if (step.type === "arrow") {
-        var isHuman = step.recipe === "human";
+        var isHuman = step.runner === "human";
         var labelCls = isHuman ? "arrow-label human" : "arrow-label";
-        var label = isHuman ? "you" : step.recipe;
+        var label = isHuman ? "you" : step.runner;
         html += '<div class="pipeline-arrow">' +
           '<span class="' + labelCls + '">' + escHtml(label) + '</span>' +
           '<div class="arrow-line"></div>' +
@@ -1259,8 +1259,8 @@ select option:disabled {
     return html;
   }
 
-  function renderConfigureRecipes() {
-    var recipes = state.config.recipes;
+  function renderConfigureRunners() {
+    var runners = state.config.runners;
     var routing = state.config.routing;
 
     var html = '<h2>Configure Runners</h2>' +
@@ -1279,10 +1279,10 @@ select option:disabled {
     // Pipeline diagram
     html += renderPipeline();
 
-    // Per-recipe configuration
+    // Per-runner configuration
     for (var i = 0; i < RUNNER_DEFS.length; i++) {
       var r = RUNNER_DEFS[i];
-      if (recipes.indexOf(r.id) === -1) continue;
+      if (runners.indexOf(r.id) === -1) continue;
       var route = routing[r.id];
 
       html += '<div style="border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:12px;background:var(--bg)">' +
@@ -1291,22 +1291,22 @@ select option:disabled {
         '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:150px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Pickup lane</label>' +
-            statusDropdown(route.fromId, "window._wizRouteField('" + r.id + "','fromId',this.value)") +
+            statusDropdown(route.fromId, "window._wizRunnerRouteField('" + r.id + "','fromId',this.value)") +
           '</div>' +
           '<div style="flex:1;min-width:150px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Result lane</label>' +
-            statusDropdown(route.toId, "window._wizRouteField('" + r.id + "','toId',this.value)") +
+            statusDropdown(route.toId, "window._wizRunnerRouteField('" + r.id + "','toId',this.value)") +
           '</div>' +
           '<div style="width:120px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Max cards</label>' +
             '<input type="number" value="' + (route.maxCards || 5) + '" min="1" style="font-size:13px" ' +
-              'onchange="window._wizRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
           '</div>' +
           (r.id !== "bounce" && r.id !== "merge" ?
           '<div style="flex:1;min-width:150px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Claude Agent</label>' +
             '<input type="text" value="' + escHtml(route.agent || '') + '" placeholder="(optional)" style="font-size:13px" ' +
-              'onchange="window._wizRouteField(\'' + r.id + '\',\'agent\',this.value)" />' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'agent\',this.value)" />' +
           '</div>' : '') +
         '</div>' +
       '</div>';
@@ -1321,8 +1321,8 @@ select option:disabled {
     return html;
   }
 
-  window._wizRouteField = function(recipe, field, val) {
-    state.config.routing[recipe][field] = val;
+  window._wizRunnerRouteField = function(runner, field, val) {
+    state.config.routing[runner][field] = val;
     renderCard();
   };
 
@@ -1375,10 +1375,10 @@ select option:disabled {
   };
 
   window._wizNext4 = function() {
-    var recipes = state.config.recipes;
+    var runners = state.config.runners;
     var routing = state.config.routing;
-    for (var i = 0; i < recipes.length; i++) {
-      var rid = recipes[i];
+    for (var i = 0; i < runners.length; i++) {
+      var rid = runners[i];
       if (!routing[rid] || !routing[rid].fromId) {
         showMsg("configMsg", "error", "Please set a pickup lane for " + rid + ".");
         return;
@@ -1468,12 +1468,12 @@ select option:disabled {
         (c.claudeAgent ? '<tr><td>Default Claude Agent</td><td>' + escHtml(c.claudeAgent) + '</td></tr>' : '') +
       '</table></div>';
 
-    // Recipes & routing
+    // Runners & routing
     html += '<div class="summary-section">' +
       '<h3>Runners</h3>' +
       '<table class="summary-table">';
-    for (var ri = 0; ri < (c.recipes || []).length; ri++) {
-      var rid = c.recipes[ri];
+    for (var ri = 0; ri < (c.runners || []).length; ri++) {
+      var rid = c.runners[ri];
       var route = (c.routing || {})[rid] || {};
       var fromName = statusName(route.fromId);
       var toName = route.toId ? statusName(route.toId) : "(stays)";
@@ -1512,16 +1512,16 @@ select option:disabled {
         TARGET_REPO: c.targetRepo || "",
         GIT_BASE_BRANCH: c.baseBranch,
         POLL_INTERVAL: String((c.pollInterval || 60) * 60),
-        RUNNERS_ENABLED: (c.recipes || []).join(",")
+        RUNNERS_ENABLED: (c.runners || []).join(",")
       };
 
       // Global Claude agent
       env["CLAUDE_AGENT"] = c.claudeAgent || "";
 
-      // Add per-recipe routing, max cards, and agent
-      var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
-      for (var i = 0; i < recipeIds.length; i++) {
-        var rid = recipeIds[i];
+      // Add per-runner routing, max cards, and agent
+      var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+      for (var i = 0; i < runnerIds.length; i++) {
+        var rid = runnerIds[i];
         var upper = rid.toUpperCase();
         var route = c.routing[rid] || {};
         env["RUNNER_" + upper + "_FROM"] = route.fromId || "";
@@ -1761,8 +1761,8 @@ select option:disabled {
     renderWelcome,
     renderDeps,
     renderBoard,
-    renderSelectRecipes,
-    renderConfigureRecipes,
+    renderSelectRunners,
+    renderConfigureRunners,
     renderGit,
     renderReview,
     renderRunning
@@ -1820,14 +1820,14 @@ select option:disabled {
         state.config.pollInterval = env.POLL_INTERVAL ? Math.round(parseInt(env.POLL_INTERVAL) / 60) : 60;
 
         if (env.RUNNERS_ENABLED) {
-          state.config.recipes = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
+          state.config.runners = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
         }
 
         state.config.claudeAgent = env.CLAUDE_AGENT || "";
 
-        var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
-        for (var i = 0; i < recipeIds.length; i++) {
-          var rid = recipeIds[i];
+        var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+        for (var i = 0; i < runnerIds.length; i++) {
+          var rid = runnerIds[i];
           var upper = rid.toUpperCase();
           var fromKey = "RUNNER_" + upper + "_FROM";
           var toKey = "RUNNER_" + upper + "_TO";

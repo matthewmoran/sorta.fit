@@ -4,7 +4,8 @@
   "description": "AI-powered sprint automation -- connects your issue board to Claude Code for card refinement, implementation, and PR review. https://sorta.fit",
   "scripts": {
     "setup": "node setup/server.js",
-    "start": "node setup/server.js"
+    "start": "node setup/server.js",
+    "test": "bash test.sh"
   },
   "keywords": [
     "claude",

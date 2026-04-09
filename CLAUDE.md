@@ -22,8 +22,10 @@ bash core/loop.sh
 bash runners/refine.sh
 bash runners/code.sh
 bash runners/review.sh
+bash runners/architect.sh
 bash runners/triage.sh
 bash runners/bounce.sh
+bash runners/documenter.sh
 bash runners/merge.sh
 
 # Generate release notes (manual, not part of the loop)
@@ -34,7 +36,20 @@ bash setup.sh          # macOS/Linux
 setup.bat              # Windows (double-click)
 ```
 
-There is no automated test suite. Testing is manual: create a test project on the board and run runners individually.
+### Testing
+
+```bash
+bash test.sh              # Run all tests
+bash test.sh --unit       # Run unit tests only
+bash test.sh --integration # Run integration tests only
+npm test                  # Same as bash test.sh
+```
+
+Tests use [bats-core](https://github.com/bats-core/bats-core) with bats-support and bats-assert (installed as git submodules under `tests/libs/`). After cloning, run `git submodule update --init --recursive` to fetch them.
+
+- **Unit tests** in `tests/unit/` — test individual functions in isolation
+- **Integration tests** in `tests/integration/` — test multi-module interactions (config loading pipeline, adapter error handling)
+- **Shared helpers** in `tests/helpers/setup.sh` — temp dir management, mock `.env` generation, mock functions
 
 ## Architecture
 
@@ -74,6 +89,15 @@ Each runner in `runners/` follows the same pattern: query cards from a source la
 ## Working on This Codebase
 
 - **Do not guess at bug fixes.** When an error is reported, trace the exact code path, read the relevant code, and identify the root cause with evidence before making changes. For bug fixes, describe the proposed fix and wait for confirmation — sometimes the initial direction is wrong and guessing creates new bugs that waste time undoing. For straightforward feature work, implementation can proceed without asking at each step.
+
+### Test-Driven Development
+
+All changes to core modules must follow TDD:
+
+1. **Write or update tests first** — before changing a function in `core/utils.sh`, `core/config.sh`, `core/runner-lib.sh`, or `adapters/`, update the corresponding test file in `tests/`
+2. **Run tests** — `bash test.sh` must pass before opening a PR
+3. **Keep tests current** — when changing functionality, update tests to match. If a test needs to change, that change should be part of the same commit as the code change
+4. **Test file mapping:** `core/utils.sh` → `tests/unit/utils.bats` + `tests/unit/render-template.bats`, `core/config.sh` → `tests/unit/config.bats`, `core/runner-lib.sh` → `tests/unit/runner-lib.bats`, `adapters/jira.sh` → `tests/integration/adapter-validation.bats`
 
 ## Shared Runner Library
 

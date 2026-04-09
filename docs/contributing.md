@@ -31,14 +31,14 @@ All bash scripts must follow these conventions:
 - **No external dependencies:** Bash scripts must only rely on tools listed in the prerequisites (bash, git, node, curl, gh, claude). Do not introduce Python, jq, or other tools.
 - **Comments:** Include a file-level comment after the shebang explaining the script's purpose. Inline comments are welcome for non-obvious logic but should not restate what the code already says.
 
-## Adding a Recipe
+## Adding a Runner
 
-1. Create `recipes/{name}.sh`.
+1. Create `runners/{name}.sh`.
 
 2. Use the standard boilerplate:
    ```bash
    #!/usr/bin/env bash
-   # Recipe: {Description}
+   # Runner: {Description}
    set -euo pipefail
 
    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,7 +49,7 @@ All bash scripts must follow these conventions:
    source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
    ```
 
-3. Follow the pattern used by existing recipes:
+3. Follow the pattern used by existing runners:
    - Query cards from a lane using `board_get_cards_in_status`
    - For each card, fetch its details with `board_get_card_*` functions
    - Render a prompt using `render_template`
@@ -73,7 +73,7 @@ For a comprehensive guide covering the runner anatomy, prompt templates, .env co
 3. Test the adapter:
    - Run `board_discover` and verify output
    - Test each `board_*` function individually against a test project
-   - Run `bash recipes/refine.sh` end-to-end to verify the full pipeline
+   - Run `bash runners/refine.sh` end-to-end to verify the full pipeline
 
 4. Document the adapter in `docs/adapters.md`.
 
@@ -83,20 +83,20 @@ For a comprehensive guide covering the runner anatomy, prompt templates, .env co
 
 2. Use `{{PLACEHOLDER}}` syntax for variables that will be substituted at runtime by `render_template`.
 
-3. Be explicit about the expected output format. Include a format specification with exact headings and structure so Claude's output can be consumed reliably by the calling recipe.
+3. Be explicit about the expected output format. Include a format specification with exact headings and structure so Claude's output can be consumed reliably by the calling runner.
 
 4. End the prompt with a reminder like "Output ONLY the {thing}. No preamble." to keep Claude's response clean.
 
 ## Testing
 
-Sorta does not have a formal test suite. Testing is done by running individual recipes against a test project on your issue board.
+Sorta does not have a formal test suite. Testing is done by running individual runners against a test project on your issue board.
 
 ### Setting Up a Test Environment
 
 1. Create a test project on your issue board (e.g., a Jira project named `TEST`).
 2. Configure `.env` to point at the test project.
 3. Create a few cards in the To Do lane with titles and brief descriptions.
-4. Run recipes individually and verify the results on the board.
+4. Run runners individually and verify the results on the board.
 
 ### What to Verify
 
@@ -104,11 +104,11 @@ Sorta does not have a formal test suite. Testing is done by running individual r
 - Claude receives a well-formed prompt (check the rendered template by adding a debug print before the Claude call).
 - The board is updated correctly (description, comments, transitions).
 - Error cases are handled gracefully (empty responses, API failures, missing cards).
-- The recipe does not modify cards it should not touch.
+- The runner does not modify cards it should not touch.
 
 ## Pull Request Guidelines
 
-- Keep PRs focused on a single change. One recipe, one adapter, or one bug fix per PR.
+- Keep PRs focused on a single change. One runner, one adapter, or one bug fix per PR.
 - Include a clear description of what the PR does and how to test it.
 - Ensure all scripts have the correct shebang and strict mode.
 - Verify Unix line endings on all files.
