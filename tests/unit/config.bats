@@ -142,3 +142,30 @@ teardown() {
     assert_success
   done
 }
+
+@test "config: github-issues adapter with empty BOARD_API_TOKEN succeeds" {
+  write_valid_env
+  local repo_dir
+  repo_dir=$(create_test_git_repo)
+  echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
+  sed_inplace "s/^BOARD_ADAPTER=.*/BOARD_ADAPTER=github-issues/" "$TEST_TEMP_DIR/.env"
+  sed_inplace "s/^BOARD_DOMAIN=.*/BOARD_DOMAIN=github.com/" "$TEST_TEMP_DIR/.env"
+  sed_inplace '/^BOARD_API_TOKEN/d' "$TEST_TEMP_DIR/.env"
+  touch "$TEST_TEMP_DIR/adapters/github-issues.config.sh"
+  run_config
+  assert_success
+}
+
+@test "config: linear adapter with empty BOARD_API_TOKEN fails" {
+  write_valid_env
+  local repo_dir
+  repo_dir=$(create_test_git_repo)
+  echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
+  sed_inplace "s/^BOARD_ADAPTER=.*/BOARD_ADAPTER=linear/" "$TEST_TEMP_DIR/.env"
+  sed_inplace "s/^BOARD_DOMAIN=.*/BOARD_DOMAIN=api.linear.app/" "$TEST_TEMP_DIR/.env"
+  sed_inplace '/^BOARD_API_TOKEN/d' "$TEST_TEMP_DIR/.env"
+  touch "$TEST_TEMP_DIR/adapters/linear.config.sh"
+  run_config
+  assert_failure
+  assert_output --partial "BOARD_API_TOKEN"
+}

@@ -89,22 +89,41 @@ For a comprehensive guide covering the runner anatomy, prompt templates, .env co
 
 ## Testing
 
-Sorta does not have a formal test suite. Testing is done by running individual runners against a test project on your issue board.
+Sorta.Fit uses [bats-core](https://github.com/bats-core/bats-core) for automated testing. All changes to core modules must follow TDD -- write or update tests before changing production code.
 
-### Setting Up a Test Environment
+### Running Tests
+
+```bash
+bash test.sh              # Run all tests
+bash test.sh --unit       # Unit tests only
+bash test.sh --integration # Integration tests only
+npm test                  # Same as bash test.sh
+```
+
+After cloning, fetch the test library submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Test Requirements
+
+- When changing a function in `core/utils.sh`, `core/config.sh`, `core/runner-lib.sh`, or `adapters/`, the corresponding test file in `tests/` must be updated in the same commit
+- All tests must pass before opening a PR
+- Unit tests go in `tests/unit/`, integration tests in `tests/integration/`
+- Shared helpers go in `tests/helpers/setup.sh`
+
+For full details on test structure, writing tests, and the validate mode, see [Testing and Validation](features/testing.md).
+
+### Manual Testing
+
+For end-to-end verification against a live board:
 
 1. Create a test project on your issue board (e.g., a Jira project named `TEST`).
 2. Configure `.env` to point at the test project.
 3. Create a few cards in the To Do lane with titles and brief descriptions.
 4. Run runners individually and verify the results on the board.
-
-### What to Verify
-
-- Cards are read from the correct lane.
-- Claude receives a well-formed prompt (check the rendered template by adding a debug print before the Claude call).
-- The board is updated correctly (description, comments, transitions).
-- Error cases are handled gracefully (empty responses, API failures, missing cards).
-- The runner does not modify cards it should not touch.
+5. Validate config without running the loop: `bash core/loop.sh --validate`
 
 ## Pull Request Guidelines
 
