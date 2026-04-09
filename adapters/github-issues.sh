@@ -44,9 +44,11 @@ github_api() {
 
   # Fallback: curl with token
   local curl_args=(-s -w "%{http_code}" -o "$tmpfile" -X "$method"
-    -H "Authorization: token $BOARD_API_TOKEN"
     -H "Accept: application/vnd.github+json"
     -H "X-GitHub-Api-Version: 2022-11-28")
+  if [[ -n "${BOARD_API_TOKEN:-}" ]]; then
+    curl_args+=(-H "Authorization: token $BOARD_API_TOKEN")
+  fi
   if [[ -n "$data" ]]; then
     curl_args+=(-H "Content-Type: application/json" -d "$data")
   fi
@@ -75,9 +77,10 @@ github_api() {
   printf '%s' "$body"
 }
 
-# Helper to strip # prefix from issue keys
+# Helper to strip GH- or # prefix from issue keys to get raw number
 gh_issue_number() {
   local key="$1"
+  key="${key#GH-}"
   echo "${key#\#}"
 }
 
@@ -95,17 +98,20 @@ board_get_cards_in_status() {
     page=$(( (start_at / max) + 1 ))
   fi
 
+  local encoded_status
+  encoded_status=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$status")
+
   local response
-  response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${status}&state=open&per_page=${max}&page=${page}&sort=created&direction=asc") || return 1
+  response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${encoded_status}&state=open&per_page=${max}&page=${page}&sort=created&direction=asc") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(Array.isArray(j))j.forEach(i=>{if(!i.pull_request)console.log(i.number)});})"
 }
 
 board_get_card_key() {
   local issue_id="$1"
-  # GitHub issue numbers are the key; return with # prefix
+  # GitHub issue numbers are the key; return with GH- prefix for shell/branch safety
   local response
   response=$(github_api "GET" "/repos/${GH_REPO}/issues/${issue_id}") || return 1
-  echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log('#'+j.number);})"
+  echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log('GH-'+j.number);})"
 }
 
 board_get_card_summary() {
@@ -127,7 +133,7 @@ board_get_card_summary() {
       const type=typeLabel?typeLabel.name:'Issue';
       const priorityLabels=labels.filter(l=>l.name.startsWith('priority:'));
       const priority=priorityLabels.length?priorityLabels[0].name.replace('priority:',''):'None';
-      console.log('Key:', '#'+j.number);
+      console.log('Key:', 'GH-'+j.number);
       console.log('Summary:', j.title);
       console.log('Status:', statusName);
       console.log('Type:', type);

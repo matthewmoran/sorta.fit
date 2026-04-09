@@ -1038,7 +1038,8 @@ select option:disabled {
   window._wizTestConn = async function() {
     var c = state.config;
     hideMsg("connMsg");
-    var missingFields = !c.domain || !c.apiToken || !c.projectKey;
+    var missingFields = !c.domain || !c.projectKey;
+    if (c.adapter !== 'github-issues') missingFields = missingFields || !c.apiToken;
     if (c.adapter === 'jira') missingFields = missingFields || !c.email;
     if (missingFields) {
       showMsg("connMsg", "error", "Please fill in all fields before testing the connection.");

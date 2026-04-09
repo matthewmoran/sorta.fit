@@ -308,7 +308,7 @@ async function handleTestConnection(req, res) {
   const body = await readBody(req);
   const { adapter, domain, email, token, projectKey } = body;
 
-  if (!adapter || !domain || !token) {
+  if (!adapter || !domain || (!token && adapter !== 'github-issues')) {
     return sendJSON(res, 400, { success: false, message: 'Missing required fields: adapter, domain, token' });
   }
 
@@ -454,7 +454,7 @@ async function handleDiscoverBoard(req, res) {
   const body = await readBody(req);
   const { adapter, domain, email, token, projectKey } = body;
 
-  if (!adapter || !domain || !token || !projectKey) {
+  if (!adapter || !domain || !projectKey || (!token && adapter !== 'github-issues')) {
     return sendJSON(res, 400, { success: false, message: 'Missing required fields' });
   }
 
@@ -605,9 +605,10 @@ async function handleDiscoverBoard(req, res) {
   } else if (adapter === 'linear') {
     const linearHost = domain || 'api.linear.app';
 
-    function linearPost(query) {
-      const payload = JSON.stringify({ query });
-      return httpsRequest({
+    try {
+      const teamQuery = `query($teamKey: String!) { teams(filter: { key: { eq: $teamKey } }) { nodes { id states { nodes { id name type } } } } }`;
+      const teamPayload = JSON.stringify({ query: teamQuery, variables: { teamKey: projectKey } });
+      const teamResult = await httpsRequest({
         hostname: linearHost,
         port: 443,
         path: '/graphql',
@@ -616,12 +617,7 @@ async function handleDiscoverBoard(req, res) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-      }, payload);
-    }
-
-    try {
-      const teamQuery = `{ teams(filter: { key: { eq: "${projectKey}" } }) { nodes { id states { nodes { id name type } } } } }`;
-      const teamResult = await linearPost(teamQuery);
+      }, teamPayload);
 
       if (teamResult.statusCode !== 200 || !teamResult.data || !teamResult.data.data) {
         const errors = teamResult.data && teamResult.data.errors;

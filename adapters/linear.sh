@@ -72,10 +72,17 @@ linear_resolve_id() {
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
 
+  local vars_file
+  vars_file=$(mktemp)
+  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
+  local vars
+  vars=$(cat "$vars_file")
+  rm -f "$vars_file"
+
   local response
   response=$(linear_graphql \
     'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { id } } }' \
-    "{\"teamKey\":\"$BOARD_PROJECT_KEY\",\"num\":$num}") || return 1
+    "$vars") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.data.issues.nodes[0])console.log(j.data.issues.nodes[0].id);})"
 }
 
