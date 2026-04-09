@@ -45,6 +45,22 @@ teardown() {
   assert_output --partial "No transition mapping found"
 }
 
+@test "runner_transition: status with colons is sanitized to underscores" {
+  # Simulates GitHub Issues label-based status (e.g., status:todo)
+  TRANSITION_TO_status_todo="status:todo"
+  runner_transition "GH-1" "status:todo" "refined"
+  [[ ${#MOCK_BOARD_TRANSITION_CALLS[@]} -eq 1 ]]
+  [[ "${MOCK_BOARD_TRANSITION_CALLS[0]}" == "GH-1 status:todo" ]]
+}
+
+@test "runner_transition: status with hyphens is sanitized to underscores" {
+  # Simulates Linear UUID-style status IDs (e.g., f2b1c3d4-5678-9abc)
+  TRANSITION_TO_f2b1c3d4_5678_9abc="f2b1c3d4-5678-9abc"
+  runner_transition "ENG-1" "f2b1c3d4-5678-9abc" "refined"
+  [[ ${#MOCK_BOARD_TRANSITION_CALLS[@]} -eq 1 ]]
+  [[ "${MOCK_BOARD_TRANSITION_CALLS[0]}" == "ENG-1 f2b1c3d4-5678-9abc" ]]
+}
+
 # ── extract_pr_url (runner-lib version uses head -1) ─────────────────────────
 
 @test "runner-lib extract_pr_url: extracts single URL" {

@@ -415,7 +415,9 @@ async function handleTestConnection(req, res) {
   } else if (adapter === 'github-issues') {
     try {
       const repoPath = projectKey || '';
-      const ghHost = domain === 'github.com' ? 'api.github.com' : (domain || 'api.github.com');
+      const isGHE = domain && domain !== 'github.com';
+      const ghHost = isGHE ? domain : 'api.github.com';
+      const ghPathPrefix = isGHE ? '/api/v3' : '';
       const headers = {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'SortaFit-Setup',
@@ -426,7 +428,7 @@ async function handleTestConnection(req, res) {
       const result = await httpsRequest({
         hostname: ghHost,
         port: 443,
-        path: `/repos/${repoPath}`,
+        path: `${ghPathPrefix}/repos/${repoPath}`,
         method: 'GET',
         headers,
       });
@@ -646,7 +648,9 @@ async function handleDiscoverBoard(req, res) {
       sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
     }
   } else if (adapter === 'github-issues') {
-    const ghHost = domain === 'github.com' ? 'api.github.com' : (domain || 'api.github.com');
+    const isGHE = domain && domain !== 'github.com';
+    const ghHost = isGHE ? domain : 'api.github.com';
+    const ghPathPrefix = isGHE ? '/api/v3' : '';
     const ghHeaders = {
       'Accept': 'application/vnd.github+json',
       'User-Agent': 'SortaFit-Setup',
@@ -658,7 +662,7 @@ async function handleDiscoverBoard(req, res) {
       return httpsRequest({
         hostname: ghHost,
         port: 443,
-        path: apiPath,
+        path: ghPathPrefix + apiPath,
         method: 'GET',
         headers: ghHeaders,
       });

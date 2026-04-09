@@ -8,7 +8,13 @@ set -euo pipefail
 GH_REPO="$BOARD_PROJECT_KEY"
 GH_CMD=$(find_gh)
 GH_USE_CLI=false
-GH_API_BASE="https://api.github.com"
+
+# Derive API base URL from BOARD_DOMAIN (supports GitHub Enterprise)
+if [[ "${BOARD_DOMAIN:-github.com}" == "github.com" ]]; then
+  GH_API_BASE="https://api.github.com"
+else
+  GH_API_BASE="https://${BOARD_DOMAIN}/api/v3"
+fi
 
 # Determine auth method: prefer gh CLI if authenticated, fall back to token + curl
 if "$GH_CMD" auth status >/dev/null 2>&1; then
@@ -29,7 +35,13 @@ github_api() {
     if [[ -n "$data" ]]; then
       gh_args+=("--input" "-")
     fi
-    if printf '%s' "$data" | "$GH_CMD" "${gh_args[@]}" > "$tmpfile" 2>/dev/null; then
+    local gh_ok=false
+    if [[ -n "$data" ]]; then
+      printf '%s' "$data" | "$GH_CMD" "${gh_args[@]}" > "$tmpfile" 2>/dev/null && gh_ok=true
+    else
+      "$GH_CMD" "${gh_args[@]}" > "$tmpfile" 2>/dev/null && gh_ok=true
+    fi
+    if [[ "$gh_ok" == "true" ]]; then
       cat "$tmpfile"
       rm -f "$tmpfile"
       return 0
@@ -93,17 +105,28 @@ board_get_cards_in_status() {
     return 1
   fi
 
-  local page=1
-  if [[ "$start_at" -gt 0 ]] && [[ "$max" -gt 0 ]]; then
-    page=$(( (start_at / max) + 1 ))
-  fi
-
   local encoded_status
   encoded_status=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$status")
 
+  # GitHub uses page-based pagination; fetch enough items to cover start_at + max, then skip
+  local fetch_count=$((start_at + max))
+  local page=1
+  local per_page=$fetch_count
+  if [[ "$per_page" -gt 100 ]]; then
+    per_page=100
+  fi
+
   local response
-  response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${encoded_status}&state=open&per_page=${max}&page=${page}&sort=created&direction=asc") || return 1
-  echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(Array.isArray(j))j.forEach(i=>{if(!i.pull_request)console.log(i.number)});})"
+  response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${encoded_status}&state=open&per_page=${per_page}&page=${page}&sort=created&direction=asc") || return 1
+  echo "$response" | node -e "
+    let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+      const j=JSON.parse(d);
+      if(!Array.isArray(j))return;
+      const issues=j.filter(i=>!i.pull_request);
+      const skip=${start_at};
+      const limit=${max};
+      for(let i=skip;i<Math.min(skip+limit,issues.length);i++) console.log(issues[i].number);
+    });"
 }
 
 board_get_card_key() {

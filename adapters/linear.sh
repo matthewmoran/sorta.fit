@@ -66,9 +66,12 @@ linear_graphql() {
   printf '%s' "$body"
 }
 
-# Helper: look up a Linear issue's internal UUID from its identifier (e.g., TEAM-123)
-linear_resolve_id() {
+# Helper: query a Linear issue by its identifier (e.g., TEAM-123) with given GraphQL fields
+# Usage: linear_query_issue <issue_key> <fields>
+# Returns the raw GraphQL response; caller parses with node -e
+linear_query_issue() {
   local issue_key="$1"
+  local fields="$2"
   local num
   num=$(echo "$issue_key" | sed 's/.*-//')
 
@@ -79,10 +82,16 @@ linear_resolve_id() {
   vars=$(cat "$vars_file")
   rm -f "$vars_file"
 
+  linear_graphql \
+    "query(\$teamKey: String!, \$num: Float!) { issues(filter: { team: { key: { eq: \$teamKey } }, number: { eq: \$num } }, first: 1) { nodes { $fields } } }" \
+    "$vars"
+}
+
+# Helper: look up a Linear issue's internal UUID from its identifier (e.g., TEAM-123)
+linear_resolve_id() {
+  local issue_key="$1"
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { id } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "id") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);if(j.data.issues.nodes[0])console.log(j.data.issues.nodes[0].id);})"
 }
 
@@ -164,19 +173,8 @@ board_get_card_key() {
 
 board_get_card_summary() {
   local issue_key="$1"
-  local num
-  num=$(echo "$issue_key" | sed 's/.*-//')
-  local vars_file
-  vars_file=$(mktemp)
-  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
-  local vars
-  vars=$(cat "$vars_file")
-  rm -f "$vars_file"
-
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { identifier title state { name } priority priorityLabel labels { nodes { name } } } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "identifier title state { name } priority priorityLabel labels { nodes { name } }") || return 1
   echo "$response" | node -e "
     let d='';
     process.stdin.on('data',c=>d+=c);
@@ -195,73 +193,29 @@ board_get_card_summary() {
 
 board_get_card_title() {
   local issue_key="$1"
-  local num
-  num=$(echo "$issue_key" | sed 's/.*-//')
-  local vars_file
-  vars_file=$(mktemp)
-  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
-  local vars
-  vars=$(cat "$vars_file")
-  rm -f "$vars_file"
-
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { title } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "title") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];console.log(i?i.title:'');})"
 }
 
 board_get_card_type() {
   local issue_key="$1"
-  local num
-  num=$(echo "$issue_key" | sed 's/.*-//')
-  local vars_file
-  vars_file=$(mktemp)
-  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
-  local vars
-  vars=$(cat "$vars_file")
-  rm -f "$vars_file"
-
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { labels { nodes { name } } } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "labels { nodes { name } }") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];const l=(i&&i.labels&&i.labels.nodes&&i.labels.nodes[0]);console.log(l?l.name:'Issue');})"
 }
 
 board_get_card_description() {
   local issue_key="$1"
-  local num
-  num=$(echo "$issue_key" | sed 's/.*-//')
-  local vars_file
-  vars_file=$(mktemp)
-  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
-  local vars
-  vars=$(cat "$vars_file")
-  rm -f "$vars_file"
-
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { description } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "description") || return 1
   echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const i=j.data.issues.nodes[0];console.log(i&&i.description?i.description:'');})"
 }
 
 board_get_card_comments() {
   local issue_key="$1"
-  local num
-  num=$(echo "$issue_key" | sed 's/.*-//')
-  local vars_file
-  vars_file=$(mktemp)
-  node -e "const fs=require('fs');fs.writeFileSync(process.argv[1],JSON.stringify({teamKey:process.argv[2],num:parseFloat(process.argv[3])}));" "$vars_file" "$BOARD_PROJECT_KEY" "$num"
-  local vars
-  vars=$(cat "$vars_file")
-  rm -f "$vars_file"
-
   local response
-  response=$(linear_graphql \
-    'query($teamKey: String!, $num: Float!) { issues(filter: { team: { key: { eq: $teamKey } }, number: { eq: $num } }, first: 1) { nodes { comments { nodes { body user { displayName } createdAt } } } } }' \
-    "$vars") || return 1
+  response=$(linear_query_issue "$issue_key" "comments { nodes { body user { displayName } createdAt } }") || return 1
   echo "$response" | node -e "
     let d='';
     process.stdin.on('data',c=>d+=c);
