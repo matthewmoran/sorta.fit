@@ -50,6 +50,7 @@ run_jira_curl_with_mock() {
   printf '%s' "$body" > "$body_file"
 
   run bash -c "
+    exec 2>&1
     export PATH='$MOCK_BIN_DIR':\$PATH
     export MOCK_CURL_HTTP_CODE='$http_code'
     export MOCK_CURL_BODY=\$(cat '$body_file')

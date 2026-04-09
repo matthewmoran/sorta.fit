@@ -65,10 +65,10 @@ if [[ "$VALIDATE_MODE" -eq 1 ]]; then
   # Verify each enabled runner
   for runner in "${RUNNER_LIST[@]}"; do
     runner="${runner#"${runner%%[![:space:]]*}"}" ; runner="${runner%"${runner##*[![:space:]]}"}"
-    local_runner_file="$SORTA_ROOT/runners/${runner}.sh"
+    runner_file_path="$SORTA_ROOT/runners/${runner}.sh"
 
-    if [[ ! -f "$local_runner_file" ]]; then
-      log_error "Runner script not found: $local_runner_file"
+    if [[ ! -f "$runner_file_path" ]]; then
+      log_error "Runner script not found: $runner_file_path"
       validation_failed=1
     fi
 

@@ -66,8 +66,3 @@ run_config() {
 sed_inplace() {
   sed -i.bak "$@" && rm -f "${@: -1}.bak"
 }
-
-# Mock board_transition for runner-lib tests
-board_transition() {
-  MOCK_BOARD_TRANSITION_CALLS+=("$*")
-}
