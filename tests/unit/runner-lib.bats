@@ -15,7 +15,6 @@ setup() {
   board_transition() {
     MOCK_BOARD_TRANSITION_CALLS+=("$*")
   }
-  export -f board_transition
   # Source runner-lib
   source "$PROJECT_ROOT/core/runner-lib.sh"
 }
