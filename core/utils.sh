@@ -114,7 +114,7 @@ matches_type_filter() {
   fi
   IFS=',' read -ra types <<< "$filter"
   for t in "${types[@]}"; do
-    t=$(echo "$t" | xargs) # trim whitespace
+    t="${t#"${t%%[![:space:]]*}"}" ; t="${t%"${t##*[![:space:]]}"}" # trim whitespace
     if [[ "$card_type" == "$t" ]]; then
       return 0
     fi
