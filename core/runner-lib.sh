@@ -63,8 +63,9 @@ setup_worktree() {
     git -C "$repo_root" branch "$branch_name" "origin/$GIT_BASE_BRANCH" >&2
   fi
 
-  # Create worktree
+  # Create worktree (prune stale entries first to avoid "branch already checked out" errors)
   mkdir -p "$worktree_dir"
+  git -C "$repo_root" worktree prune 2>/dev/null
   git -C "$repo_root" worktree add "$card_worktree" "$branch_name" 2>/dev/null >&2 || {
     log_error "Could not create worktree for $issue_key"
     return 1
