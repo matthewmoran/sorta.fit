@@ -49,12 +49,25 @@ create_test_git_repo() {
   echo "$repo_dir"
 }
 
+# Shared helper: run config.sh in a subshell with a given .env
+# Unsets all board vars so only .env values are used
+# Requires: TEST_TEMP_DIR set, config.sh copied to $TEST_TEMP_DIR/core/
+run_config() {
+  run bash -c "
+    unset BOARD_ADAPTER BOARD_DOMAIN BOARD_API_TOKEN BOARD_PROJECT_KEY BOARD_EMAIL TARGET_REPO
+    unset GIT_BASE_BRANCH POLL_INTERVAL RUNNERS_ENABLED
+    export HOME='$TEST_TEMP_DIR'
+    cd '$TEST_TEMP_DIR'
+    source '$TEST_TEMP_DIR/core/config.sh'
+  "
+}
+
+# Portable sed in-place editing (works on both GNU and BSD sed)
+sed_inplace() {
+  sed -i.bak "$@" && rm -f "${@: -1}.bak"
+}
+
 # Mock board_transition for runner-lib tests
 board_transition() {
   MOCK_BOARD_TRANSITION_CALLS+=("$*")
 }
-
-# Mock logging functions (capture to arrays)
-mock_log_info() { MOCK_LOG_INFO+=("$*"); }
-mock_log_warn() { MOCK_LOG_WARN+=("$*"); }
-mock_log_error() { MOCK_LOG_ERROR+=("$*"); }

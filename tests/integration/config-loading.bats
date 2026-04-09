@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # Integration tests for config loading pipeline
+# Focused on default values and overrides (validation logic is in unit/config.bats)
 
 TESTS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 PROJECT_ROOT="$(cd "$TESTS_DIR/.." && pwd)"
@@ -15,45 +16,6 @@ setup() {
 
 teardown() {
   teardown_test_env
-}
-
-run_config() {
-  run bash -c "
-    unset BOARD_ADAPTER BOARD_DOMAIN BOARD_API_TOKEN BOARD_PROJECT_KEY BOARD_EMAIL TARGET_REPO
-    unset GIT_BASE_BRANCH POLL_INTERVAL RUNNERS_ENABLED
-    export HOME='$TEST_TEMP_DIR'
-    cd '$TEST_TEMP_DIR'
-    source '$TEST_TEMP_DIR/core/config.sh'
-  "
-}
-
-@test "integration: valid .env with all required vars loads without error" {
-  write_valid_env
-  local repo_dir
-  repo_dir=$(create_test_git_repo)
-  echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  run_config
-  assert_success
-}
-
-@test "integration: .env missing BOARD_API_TOKEN exits non-zero" {
-  write_valid_env
-  local repo_dir
-  repo_dir=$(create_test_git_repo)
-  echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i '/^BOARD_API_TOKEN/d' "$TEST_TEMP_DIR/.env"
-  run_config
-  assert_failure
-  assert_output --partial "BOARD_API_TOKEN"
-}
-
-@test "integration: valid TARGET_REPO (temp git repo) succeeds" {
-  write_valid_env
-  local repo_dir
-  repo_dir=$(create_test_git_repo)
-  echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  run_config
-  assert_success
 }
 
 @test "integration: default GIT_BASE_BRANCH is main when not set" {

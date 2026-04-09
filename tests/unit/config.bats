@@ -19,18 +19,6 @@ teardown() {
   teardown_test_env
 }
 
-# Helper: run config.sh in a subshell with a given .env
-# Unsets all board vars so only .env values are used
-run_config() {
-  run bash -c "
-    unset BOARD_ADAPTER BOARD_DOMAIN BOARD_API_TOKEN BOARD_PROJECT_KEY BOARD_EMAIL TARGET_REPO
-    unset GIT_BASE_BRANCH POLL_INTERVAL RUNNERS_ENABLED
-    export HOME='$TEST_TEMP_DIR'
-    cd '$TEST_TEMP_DIR'
-    source '$TEST_TEMP_DIR/core/config.sh'
-  "
-}
-
 @test "config: valid config loads without error" {
   write_valid_env
   local repo_dir
@@ -46,7 +34,7 @@ run_config() {
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
   # Remove BOARD_ADAPTER line
-  sed -i '/^BOARD_ADAPTER/d' "$TEST_TEMP_DIR/.env"
+  sed_inplace '/^BOARD_ADAPTER/d' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
 }
@@ -56,7 +44,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i 's/^BOARD_ADAPTER=.*/BOARD_ADAPTER=dropbox/' "$TEST_TEMP_DIR/.env"
+  sed_inplace 's/^BOARD_ADAPTER=.*/BOARD_ADAPTER=dropbox/' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
   assert_output --partial "Unknown adapter"
@@ -67,7 +55,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=https:\/\/foo.atlassian.net/' "$TEST_TEMP_DIR/.env"
+  sed_inplace 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=https:\/\/foo.atlassian.net/' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
   assert_output --partial "Invalid BOARD_DOMAIN"
@@ -78,7 +66,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=foo.atlassian.net\//' "$TEST_TEMP_DIR/.env"
+  sed_inplace 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=foo.atlassian.net\//' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
   assert_output --partial "Invalid BOARD_DOMAIN"
@@ -89,7 +77,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=x/' "$TEST_TEMP_DIR/.env"
+  sed_inplace 's/^BOARD_DOMAIN=.*/BOARD_DOMAIN=x/' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
   assert_output --partial "Invalid BOARD_DOMAIN"
@@ -100,7 +88,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i '/^BOARD_API_TOKEN/d' "$TEST_TEMP_DIR/.env"
+  sed_inplace '/^BOARD_API_TOKEN/d' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
 }
@@ -110,7 +98,7 @@ run_config() {
   local repo_dir
   repo_dir=$(create_test_git_repo)
   echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-  sed -i '/^BOARD_PROJECT_KEY/d' "$TEST_TEMP_DIR/.env"
+  sed_inplace '/^BOARD_PROJECT_KEY/d' "$TEST_TEMP_DIR/.env"
   run_config
   assert_failure
 }
@@ -147,7 +135,7 @@ run_config() {
     local repo_dir
     repo_dir=$(create_test_git_repo)
     echo "TARGET_REPO=$repo_dir" >> "$TEST_TEMP_DIR/.env"
-    sed -i "s/^BOARD_ADAPTER=.*/BOARD_ADAPTER=$adapter/" "$TEST_TEMP_DIR/.env"
+    sed_inplace "s/^BOARD_ADAPTER=.*/BOARD_ADAPTER=$adapter/" "$TEST_TEMP_DIR/.env"
     # Create adapter config for this adapter
     touch "$TEST_TEMP_DIR/adapters/${adapter}.config.sh"
     run_config

@@ -50,10 +50,7 @@ echo "  Base branch: $GIT_BASE_BRANCH"
 echo "================================================"
 echo ""
 
-# Preflight
-preflight_check || exit 1
-
-# Validate mode: check runner config and exit
+# Validate mode: check runner config and exit (skip preflight — no need for claude/gh)
 if [[ "$VALIDATE_MODE" -eq 1 ]]; then
   log_step "Running validation checks..."
   validation_failed=0
@@ -67,7 +64,7 @@ if [[ "$VALIDATE_MODE" -eq 1 ]]; then
 
   # Verify each enabled runner
   for runner in "${RUNNER_LIST[@]}"; do
-    runner=$(echo "$runner" | xargs)
+    runner="${runner#"${runner%%[![:space:]]*}"}" ; runner="${runner%"${runner##*[![:space:]]}"}"
     local_runner_file="$SORTA_ROOT/runners/${runner}.sh"
 
     if [[ ! -f "$local_runner_file" ]]; then
@@ -91,6 +88,9 @@ if [[ "$VALIDATE_MODE" -eq 1 ]]; then
   exit 0
 fi
 
+# Preflight
+preflight_check || exit 1
+
 run_cycle() {
   if is_rate_limited; then
     return
@@ -106,7 +106,7 @@ run_cycle() {
   local total=${#RUNNER_LIST[@]}
 
   for runner in "${RUNNER_LIST[@]}"; do
-    runner=$(echo "$runner" | xargs) # trim whitespace
+    runner="${runner#"${runner%%[![:space:]]*}"}" ; runner="${runner%"${runner##*[![:space:]]}"}"
     local runner_file="$SORTA_ROOT/runners/${runner}.sh"
 
     if [[ ! -f "$runner_file" ]]; then
