@@ -22,7 +22,7 @@ Every adapter must implement the following functions. Runners depend on these ex
 board_get_cards_in_status <status_name> <max_results>
 ```
 
-Query the board for cards in a given status. Output one card ID per line to stdout. The IDs are opaque -- they can be internal IDs (Jira uses numeric IDs) or keys, as long as `board_get_card_key` can resolve them.
+Query the board for cards in a given status. Output one card ID per line to stdout. The IDs are opaque -- they can be internal IDs (Jira: numeric IDs, Linear: UUIDs, GitHub Issues: issue numbers), as long as `board_get_card_key` can resolve them.
 
 **Parameters:**
 - `status_name` -- The status name to query (e.g., "To Do", "Agent", "QA")
@@ -150,7 +150,7 @@ Move a card to a different status using a transition ID. Transition IDs are boar
 
 **Parameters:**
 - `card_key` -- The card key
-- `transition_id` -- The numeric transition ID (from the adapter config)
+- `transition_id` -- The transition ID from the adapter config (Jira: numeric transition ID; Linear: target state UUID; GitHub Issues: target label name)
 
 **Output:** None.
 
@@ -175,40 +175,27 @@ Each adapter has a config file that maps your board's workflow to Sorta's lane m
 
 ### Status Variables
 
-Used by runners to query cards in specific lanes. Variables use the pattern `STATUS_<id>` where `<id>` is the board's numeric status ID:
+Used by runners to query cards in specific lanes. Variables use the pattern `STATUS_<id>` where `<id>` is the board's status identifier. IDs must be sanitized to valid bash variable names (letters, digits, underscores only):
 
-| Pattern | Example | Purpose |
-|---------|---------|---------|
-| `STATUS_<id>="Display Name"` | `STATUS_10000="To Do"` | Maps a status ID to its human-readable name |
+| Adapter | ID Format | Example |
+|---------|-----------|---------|
+| Jira | Numeric IDs | `STATUS_10000="To Do"` |
+| Linear | UUIDs (hyphens replaced with underscores) | `STATUS_f2b1c3d4_5678_9abc_def0_1234567890ab="Todo"` |
+| GitHub Issues | Label names (colons/hyphens replaced with underscores) | `STATUS_status_todo="To Do"` |
 
-Define one variable per status in your workflow. The IDs come from `board_discover` output. Example from `jira.config.sh.example`:
-
-```bash
-STATUS_10000="To Do"
-STATUS_10070="Refined"
-STATUS_10069="Agent"
-STATUS_10001="In Progress"
-STATUS_10036="QA"
-STATUS_10002="Done"
-```
+Define one variable per status in your workflow. The IDs come from `board_discover` output.
 
 ### Transition Variables
 
-Used by runners to move cards between lanes. Variables use the pattern `TRANSITION_TO_<statusId>` where `<statusId>` is the target status ID:
+Used by runners to move cards between lanes. Variables use the pattern `TRANSITION_TO_<statusId>` where `<statusId>` is the sanitized target status ID:
 
-| Pattern | Example | Purpose |
-|---------|---------|---------|
-| `TRANSITION_TO_<statusId>=<transitionId>` | `TRANSITION_TO_10070=5` | Maps a target status ID to the transition ID needed to reach it |
+| Adapter | Example | Notes |
+|---------|---------|-------|
+| Jira | `TRANSITION_TO_10070=5` | Value is a separate Jira transition ID |
+| Linear | `TRANSITION_TO_f2b1c3d4_5678_...=f2b1c3d4-5678-...` | Value is the target state UUID (direct transitions) |
+| GitHub Issues | `TRANSITION_TO_status_todo=status:todo` | Value is the real label name |
 
-Define one variable per transition your workflow uses. Example:
-
-```bash
-TRANSITION_TO_10000=11
-TRANSITION_TO_10070=5
-TRANSITION_TO_10069=4
-TRANSITION_TO_10036=3
-TRANSITION_TO_10002=31
-```
+Define one variable per transition your workflow uses.
 
 Not all statuses and transitions are required. Only define the ones your runners use. At minimum, you need the statuses and transitions for the lanes your enabled runners read from and write to.
 
@@ -303,23 +290,37 @@ Test end-to-end with a single runner against a test project:
 bash runners/refine.sh
 ```
 
-## Reference: Jira Adapter
+## Supported Adapters
 
-The Jira adapter (`adapters/jira.sh`) is the reference implementation. Key implementation details:
+### Jira (`adapters/jira.sh`)
+
+The Jira adapter is the original reference implementation.
 
 - **Authentication:** Basic auth using `BOARD_EMAIL:BOARD_API_TOKEN`
 - **Base URL:** `https://{BOARD_DOMAIN}/rest/api/3`
 - **Card queries:** Uses JQL via the `/search/jql` endpoint
-- **Rich text:** Jira uses Atlassian Document Format (ADF). The adapter converts ADF to plain text for reading and markdown to ADF for writing.
-- **JSON parsing:** All JSON processing uses inline `node -e` scripts that read from stdin.
-- **Transitions:** Uses the `/issue/{key}/transitions` endpoint with numeric transition IDs.
+- **Rich text:** Jira uses Atlassian Document Format (ADF). The adapter converts ADF to plain text for reading and markdown to ADF for writing
+- **JSON parsing:** All JSON processing uses inline `node -e` scripts that read from stdin
+- **Transitions:** Uses the `/issue/{key}/transitions` endpoint with numeric transition IDs
+- **Status IDs:** Numeric (e.g., `10000`, `10070`)
 
-## Planned Adapters
+### Linear (`adapters/linear.sh`)
 
-### Linear
+- **Authentication:** Bearer token against the GraphQL API (`https://api.linear.app/graphql`)
+- **Card queries:** GraphQL queries filtered by team key and workflow state ID
+- **Rich text:** Native markdown -- no format conversion needed for descriptions or comments
+- **Transitions:** Direct state-to-state updates via `issueUpdate` mutation; no intermediate transition IDs
+- **Status IDs:** UUIDs (e.g., `f2b1c3d4-5678-9abc-def0-1234567890ab`); sanitized to underscores in config variable names
+- **Card keys:** Uses Linear's identifier format (e.g., `ENG-123`)
 
-Linear uses a GraphQL API with bearer token authentication. The adapter would query issues by state, read/write descriptions in markdown (Linear uses native markdown, so no format conversion is needed), and use state IDs for transitions.
+### GitHub Issues (`adapters/github-issues.sh`)
 
-### GitHub Issues
+- **Authentication:** Prefers `gh` CLI (handles auth automatically); falls back to `curl` with `BOARD_API_TOKEN` if `gh` is unavailable
+- **Card queries:** REST API, filtering by label (e.g., `status:todo`)
+- **Rich text:** Native markdown -- no conversion needed
+- **Transitions:** Label swap -- removes existing `status:*` labels and adds the target label
+- **Status IDs:** Label names (e.g., `status:todo`, `status:refined`); sanitized to underscores in config variable names
+- **Card keys:** Issue numbers with `GH-` prefix (e.g., `GH-42`)
+- **GitHub Enterprise:** Supported; set `BOARD_DOMAIN` to your GHE domain and the adapter derives the `/api/v3` base URL
 
-GitHub Issues can be accessed via the `gh` CLI or the REST API. Labels or project board columns would map to Sorta's lane model. Descriptions and comments are native markdown.
+For detailed usage, configuration examples, and setup instructions for each adapter, see [Board Adapters](features/board-adapters.md).
