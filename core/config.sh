@@ -33,8 +33,14 @@ if [[ ! "$BOARD_DOMAIN" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+[a-zA-Z0-9]$ ]]; then
   exit 1
 fi
 : "${BOARD_DOMAIN:?BOARD_DOMAIN not set}"
-: "${BOARD_API_TOKEN:?BOARD_API_TOKEN not set}"
 : "${BOARD_PROJECT_KEY:?BOARD_PROJECT_KEY not set}"
+
+# BOARD_API_TOKEN is required for Jira and Linear; optional for GitHub Issues (can use gh auth)
+export BOARD_API_TOKEN="${BOARD_API_TOKEN:-}"
+if [[ -z "$BOARD_API_TOKEN" && "$BOARD_ADAPTER" != "github-issues" ]]; then
+  echo "ERROR: BOARD_API_TOKEN not set (required for $BOARD_ADAPTER adapter)"
+  exit 1
+fi
 
 # TARGET_REPO — the repository sorta.fit operates on
 if [[ -n "${TARGET_REPO:-}" ]]; then

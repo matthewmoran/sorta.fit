@@ -3,6 +3,7 @@
 // Zero-dependency Node.js HTTP server (built-ins only)
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -65,6 +66,40 @@ function readBody(req) {
       }
     });
     req.on('error', reject);
+  });
+}
+
+function httpsRequest(opts, payload) {
+  return new Promise((resolve, reject) => {
+    if (payload) {
+      opts.headers = opts.headers || {};
+      opts.headers['Content-Length'] = Buffer.byteLength(payload);
+    }
+
+    const request = https.request(opts, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf-8');
+        try {
+          resolve({ statusCode: response.statusCode, data: JSON.parse(raw) });
+        } catch {
+          resolve({ statusCode: response.statusCode, data: raw });
+        }
+      });
+    });
+
+    request.on('error', reject);
+    request.setTimeout(15000, () => {
+      request.destroy();
+      reject(new Error('Request timed out'));
+    });
+
+    if (payload) {
+      request.end(payload);
+    } else {
+      request.end();
+    }
   });
 }
 
@@ -193,13 +228,13 @@ async function handleLoadConfig(req, res) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
 
-      const statusMatch = trimmed.match(/^STATUS_(\d+)=["']?(.+?)["']?$/);
+      const statusMatch = trimmed.match(/^STATUS_([^=]+)=["']?(.+?)["']?$/);
       if (statusMatch) {
         statuses.push({ id: statusMatch[1], name: statusMatch[2] });
         continue;
       }
 
-      const transMatch = trimmed.match(/^TRANSITION_TO_(\d+)=(\d+)$/);
+      const transMatch = trimmed.match(/^TRANSITION_TO_([^=]+)=(.+)$/);
       if (transMatch) {
         transitions.push({ statusId: transMatch[1], transitionId: transMatch[2] });
       }
@@ -273,7 +308,7 @@ async function handleTestConnection(req, res) {
   const body = await readBody(req);
   const { adapter, domain, email, token, projectKey } = body;
 
-  if (!adapter || !domain || !token) {
+  if (!adapter || !domain || (!token && adapter !== 'github-issues')) {
     return sendJSON(res, 400, { success: false, message: 'Missing required fields: adapter, domain, token' });
   }
 
@@ -286,9 +321,7 @@ async function handleTestConnection(req, res) {
       const auth = Buffer.from(`${email}:${token}`).toString('base64');
       const jiraUrl = `https://${domain}/rest/api/3/myself`;
 
-      // Use Node built-in https
       const result = await new Promise((resolve, reject) => {
-        const https = require('https');
         const parsed = new URL(jiraUrl);
 
         const reqOpts = {
@@ -342,6 +375,76 @@ async function handleTestConnection(req, res) {
     } catch (err) {
       sendJSON(res, 200, { success: false, message: `Connection failed: ${err.message}` });
     }
+  } else if (adapter === 'linear') {
+    try {
+      const payload = JSON.stringify({ query: '{ viewer { id name email } }' });
+      const linearHost = domain || 'api.linear.app';
+
+      const result = await httpsRequest({
+        hostname: linearHost,
+        port: 443,
+        path: '/graphql',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }, payload);
+
+      if (result.statusCode === 200 && result.data && result.data.data && result.data.data.viewer && result.data.data.viewer.name) {
+        sendJSON(res, 200, {
+          success: true,
+          message: `Connected as ${result.data.data.viewer.name} (${result.data.data.viewer.email || ''})`,
+          user: {
+            displayName: result.data.data.viewer.name,
+            emailAddress: result.data.data.viewer.email,
+          },
+        });
+      } else {
+        const errors = result.data && result.data.errors;
+        const msg = errors && errors.length
+          ? errors[0].message
+          : `HTTP ${result.statusCode} — check API token`;
+        sendJSON(res, 200, { success: false, message: msg });
+      }
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Connection failed: ${err.message}` });
+    }
+  } else if (adapter === 'github-issues') {
+    try {
+      const repoPath = projectKey || '';
+      const isGHE = domain && domain !== 'github.com';
+      const ghHost = isGHE ? domain : 'api.github.com';
+      const ghPathPrefix = isGHE ? '/api/v3' : '';
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'SortaFit-Setup',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
+      if (token) headers['Authorization'] = `token ${token}`;
+
+      const result = await httpsRequest({
+        hostname: ghHost,
+        port: 443,
+        path: `${ghPathPrefix}/repos/${repoPath}`,
+        method: 'GET',
+        headers,
+      });
+
+      if (result.statusCode === 200 && result.data && result.data.full_name) {
+        sendJSON(res, 200, {
+          success: true,
+          message: `Connected to ${result.data.full_name} (${result.data.open_issues_count} open issues)`,
+        });
+      } else {
+        const msg = result.data && result.data.message
+          ? result.data.message
+          : `HTTP ${result.statusCode} — check token and project key (owner/repo)`;
+        sendJSON(res, 200, { success: false, message: msg });
+      }
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Connection failed: ${err.message}` });
+    }
   } else {
     sendJSON(res, 400, { success: false, message: `Adapter "${adapter}" is not yet supported in the setup wizard` });
   }
@@ -351,7 +454,7 @@ async function handleDiscoverBoard(req, res) {
   const body = await readBody(req);
   const { adapter, domain, email, token, projectKey } = body;
 
-  if (!adapter || !domain || !token || !projectKey) {
+  if (!adapter || !domain || !projectKey || (!token && adapter !== 'github-issues')) {
     return sendJSON(res, 400, { success: false, message: 'Missing required fields' });
   }
 
@@ -361,7 +464,6 @@ async function handleDiscoverBoard(req, res) {
     }
 
     const auth = Buffer.from(`${email}:${token}`).toString('base64');
-    const https = require('https');
 
     // Helper for HTTPS GET requests
     function jiraGet(urlPath) {
@@ -494,6 +596,107 @@ async function handleDiscoverBoard(req, res) {
         }
       }
       const transitions = Array.from(transitionMap.values());
+
+      sendJSON(res, 200, { success: true, statuses, transitions });
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
+    }
+  } else if (adapter === 'linear') {
+    const linearHost = domain || 'api.linear.app';
+
+    try {
+      const teamQuery = `query($teamKey: String!) { teams(filter: { key: { eq: $teamKey } }) { nodes { id states { nodes { id name type } } } } }`;
+      const teamPayload = JSON.stringify({ query: teamQuery, variables: { teamKey: projectKey } });
+      const teamResult = await httpsRequest({
+        hostname: linearHost,
+        port: 443,
+        path: '/graphql',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }, teamPayload);
+
+      if (teamResult.statusCode !== 200 || !teamResult.data || !teamResult.data.data) {
+        const errors = teamResult.data && teamResult.data.errors;
+        const msg = errors && errors.length ? errors[0].message : `HTTP ${teamResult.statusCode}`;
+        return sendJSON(res, 200, { success: false, message: `Discovery failed: ${msg}` });
+      }
+
+      const teams = teamResult.data.data.teams && teamResult.data.data.teams.nodes;
+      if (!teams || !teams.length) {
+        return sendJSON(res, 200, { success: false, message: `Team "${projectKey}" not found. Check BOARD_PROJECT_KEY.` });
+      }
+
+      const states = teams[0].states.nodes || [];
+      const statuses = states.map(s => ({ id: s.id, name: `${s.name} (${s.type})` }));
+
+      // In Linear, transitions are direct state-to-state; every state is a valid target
+      const transitions = states.map(s => ({
+        id: s.id,
+        name: s.name,
+        toName: s.name,
+        toId: s.id,
+      }));
+
+      sendJSON(res, 200, { success: true, statuses, transitions });
+    } catch (err) {
+      sendJSON(res, 200, { success: false, message: `Discovery failed: ${err.message}` });
+    }
+  } else if (adapter === 'github-issues') {
+    const isGHE = domain && domain !== 'github.com';
+    const ghHost = isGHE ? domain : 'api.github.com';
+    const ghPathPrefix = isGHE ? '/api/v3' : '';
+    const ghHeaders = {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'SortaFit-Setup',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (token) ghHeaders['Authorization'] = `token ${token}`;
+
+    function githubGet(apiPath) {
+      return httpsRequest({
+        hostname: ghHost,
+        port: 443,
+        path: ghPathPrefix + apiPath,
+        method: 'GET',
+        headers: ghHeaders,
+      });
+    }
+
+    try {
+      const labelsResult = await githubGet(`/repos/${projectKey}/labels?per_page=100`);
+
+      if (labelsResult.statusCode !== 200) {
+        const msg = labelsResult.data && labelsResult.data.message
+          ? labelsResult.data.message
+          : `HTTP ${labelsResult.statusCode}`;
+        return sendJSON(res, 200, { success: false, message: `Discovery failed: ${msg}` });
+      }
+
+      const labels = Array.isArray(labelsResult.data) ? labelsResult.data : [];
+      const statusLabels = labels.filter(l => l.name.startsWith('status:'));
+
+      if (!statusLabels.length) {
+        return sendJSON(res, 200, {
+          success: false,
+          message: 'No "status:" labels found. Create labels with a "status:" prefix (e.g., status:todo, status:refined, status:in-progress, status:done) and run discovery again.',
+        });
+      }
+
+      const statuses = statusLabels.map(l => ({
+        id: l.name,
+        name: l.description || l.name.replace('status:', ''),
+      }));
+
+      // GitHub Issues transitions are label swaps; all-to-all
+      const transitions = statusLabels.map(l => ({
+        id: l.name,
+        name: l.name,
+        toName: l.description || l.name.replace('status:', ''),
+        toId: l.name,
+      }));
 
       sendJSON(res, 200, { success: true, statuses, transitions });
     } catch (err) {
