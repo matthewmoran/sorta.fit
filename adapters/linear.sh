@@ -69,6 +69,7 @@ linear_graphql() {
 # Helper: query a Linear issue by its identifier (e.g., TEAM-123) with given GraphQL fields
 # Usage: linear_query_issue <issue_key> <fields>
 # Returns the raw GraphQL response; caller parses with node -e
+# IMPORTANT: fields must be a trusted hardcoded string — never pass user input
 linear_query_issue() {
   local issue_key="$1"
   local fields="$2"
@@ -104,36 +105,7 @@ board_get_cards_in_status() {
     return 1
   fi
 
-  if [[ "$start_at" -gt 0 ]]; then
-    local fetch_count=$((start_at + max))
-    local vars_file
-    vars_file=$(mktemp)
-    node -e "
-      const fs = require('fs');
-      fs.writeFileSync(process.argv[1], JSON.stringify({
-        teamKey: process.argv[2],
-        stateId: process.argv[3],
-        count: parseInt(process.argv[4], 10)
-      }));
-    " "$vars_file" "$BOARD_PROJECT_KEY" "$status" "$fetch_count"
-    local vars
-    vars=$(cat "$vars_file")
-    rm -f "$vars_file"
-
-    local response
-    response=$(linear_graphql \
-      'query($teamKey: String!, $stateId: String!, $count: Int!) { issues(filter: { team: { key: { eq: $teamKey } }, state: { id: { eq: $stateId } } }, first: $count, orderBy: createdAt) { nodes { id } } }' \
-      "$vars") || return 1
-    echo "$response" | node -e "
-      let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-        const j=JSON.parse(d);
-        const nodes=j.data.issues.nodes||[];
-        const skip=${start_at};
-        for(let i=skip;i<nodes.length;i++) console.log(nodes[i].id);
-      });"
-    return 0
-  fi
-
+  local fetch_count=$((start_at + max))
   local vars_file
   vars_file=$(mktemp)
   node -e "
@@ -143,7 +115,7 @@ board_get_cards_in_status() {
       stateId: process.argv[3],
       count: parseInt(process.argv[4], 10)
     }));
-  " "$vars_file" "$BOARD_PROJECT_KEY" "$status" "$max"
+  " "$vars_file" "$BOARD_PROJECT_KEY" "$status" "$fetch_count"
   local vars
   vars=$(cat "$vars_file")
   rm -f "$vars_file"
@@ -152,7 +124,13 @@ board_get_cards_in_status() {
   response=$(linear_graphql \
     'query($teamKey: String!, $stateId: String!, $count: Int!) { issues(filter: { team: { key: { eq: $teamKey } }, state: { id: { eq: $stateId } } }, first: $count, orderBy: createdAt) { nodes { id } } }' \
     "$vars") || return 1
-  echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);(j.data.issues.nodes||[]).forEach(i=>console.log(i.id));})"
+  echo "$response" | node -e "
+    let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+      const j=JSON.parse(d);
+      const nodes=j.data.issues.nodes||[];
+      const skip=${start_at};
+      for(let i=skip;i<nodes.length;i++) console.log(nodes[i].id);
+    });"
 }
 
 board_get_card_key() {

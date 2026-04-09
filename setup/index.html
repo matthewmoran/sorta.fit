@@ -1032,7 +1032,12 @@ select option:disabled {
     state.config[field] = val;
     state.connectionTested = false;
     state.boardDiscovered = false;
-    if (field === 'adapter') renderCard();
+    if (field === 'adapter') {
+      var defaults = { jira: '', linear: 'api.linear.app', 'github-issues': 'github.com' };
+      state.config.domain = defaults[val] || '';
+      if (val !== 'jira') state.config.email = '';
+      renderCard();
+    }
   };
 
   window._wizTestConn = async function() {

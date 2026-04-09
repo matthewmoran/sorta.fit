@@ -108,25 +108,50 @@ board_get_cards_in_status() {
   local encoded_status
   encoded_status=$(node -e "console.log(encodeURIComponent(process.argv[1]))" "$status")
 
-  # GitHub uses page-based pagination; fetch enough items to cover start_at + max, then skip
+  # GitHub uses page-based pagination (max 100 per page).
+  # Fetch pages until we have start_at + max items, then slice.
   local fetch_count=$((start_at + max))
+  local all_numbers=""
   local page=1
-  local per_page=$fetch_count
-  if [[ "$per_page" -gt 100 ]]; then
-    per_page=100
+  local per_page=100
+  if [[ "$fetch_count" -lt "$per_page" ]]; then
+    per_page=$fetch_count
   fi
 
-  local response
-  response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${encoded_status}&state=open&per_page=${per_page}&page=${page}&sort=created&direction=asc") || return 1
-  echo "$response" | node -e "
-    let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-      const j=JSON.parse(d);
-      if(!Array.isArray(j))return;
-      const issues=j.filter(i=>!i.pull_request);
-      const skip=${start_at};
-      const limit=${max};
-      for(let i=skip;i<Math.min(skip+limit,issues.length);i++) console.log(issues[i].number);
-    });"
+  while true; do
+    local response
+    response=$(github_api "GET" "/repos/${GH_REPO}/issues?labels=${encoded_status}&state=open&per_page=${per_page}&page=${page}&sort=created&direction=asc") || return 1
+
+    local page_numbers page_count
+    page_numbers=$(echo "$response" | node -e "
+      let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+        const j=JSON.parse(d);
+        if(!Array.isArray(j)){process.exit(0);}
+        const issues=j.filter(i=>!i.pull_request);
+        issues.forEach(i=>console.log(i.number));
+      });")
+    page_count=$(echo "$response" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(Array.isArray(j)?j.length:0);})")
+
+    if [[ -n "$page_numbers" ]]; then
+      if [[ -n "$all_numbers" ]]; then
+        all_numbers="${all_numbers}"$'\n'"${page_numbers}"
+      else
+        all_numbers="$page_numbers"
+      fi
+    fi
+
+    local total_collected
+    total_collected=$(echo "$all_numbers" | grep -c . 2>/dev/null || echo "0")
+
+    if [[ "$total_collected" -ge "$fetch_count" ]] || [[ "$page_count" -lt "$per_page" ]]; then
+      break
+    fi
+    page=$((page + 1))
+  done
+
+  if [[ -n "$all_numbers" ]]; then
+    echo "$all_numbers" | tail -n +"$((start_at + 1))" | head -n "$max"
+  fi
 }
 
 board_get_card_key() {

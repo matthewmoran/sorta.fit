@@ -3,6 +3,7 @@
 // Zero-dependency Node.js HTTP server (built-ins only)
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -69,7 +70,6 @@ function readBody(req) {
 }
 
 function httpsRequest(opts, payload) {
-  const https = require('https');
   return new Promise((resolve, reject) => {
     if (payload) {
       opts.headers = opts.headers || {};
@@ -321,9 +321,7 @@ async function handleTestConnection(req, res) {
       const auth = Buffer.from(`${email}:${token}`).toString('base64');
       const jiraUrl = `https://${domain}/rest/api/3/myself`;
 
-      // Use Node built-in https
       const result = await new Promise((resolve, reject) => {
-        const https = require('https');
         const parsed = new URL(jiraUrl);
 
         const reqOpts = {
@@ -466,7 +464,6 @@ async function handleDiscoverBoard(req, res) {
     }
 
     const auth = Buffer.from(`${email}:${token}`).toString('base64');
-    const https = require('https');
 
     // Helper for HTTPS GET requests
     function jiraGet(urlPath) {
