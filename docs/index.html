@@ -448,7 +448,240 @@ footer a:hover {
   color: var(--text);
 }
 
+/* ---- Pricing ---- */
+
+.pricing-section {
+  padding: 100px 24px;
+  text-align: center;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.pricing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s, transform 0.5s, border-color 0.2s;
+}
+
+.pricing-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pricing-card:hover {
+  border-color: var(--accent);
+}
+
+.pricing-card.featured {
+  border-color: var(--accent);
+  background: linear-gradient(var(--surface), var(--surface)) padding-box,
+              linear-gradient(135deg, var(--accent), transparent 60%) border-box;
+  box-shadow: 0 0 32px var(--accent-glow);
+}
+
+.pricing-tier {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.pricing-price {
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.pricing-price span {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.pricing-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  flex: 1;
+}
+
+.pricing-features li {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding-left: 20px;
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.pricing-features li::before {
+  content: "\2713";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.pricing-cta {
+  display: inline-block;
+  padding: 12px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
+  text-align: center;
+  width: 100%;
+}
+
+.pricing-cta:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.pricing-cta-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pricing-cta-primary:hover {
+  background: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(167, 139, 250, 0.3);
+}
+
+/* ---- Pricing Form Overlay ---- */
+
+.pricing-form-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+}
+
+.pricing-form-overlay.active {
+  display: flex;
+}
+
+.pricing-form-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  position: relative;
+}
+
+.pricing-form-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: color 0.2s;
+}
+
+.pricing-form-close:hover {
+  color: var(--text);
+}
+
+.pricing-form-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+}
+
+.pricing-form-submit {
+  margin-top: 8px;
+}
+
+.pricing-form-success {
+  display: none;
+  text-align: center;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 24px 0 8px;
+}
+
+.pricing-form-success.active {
+  display: block;
+}
+
 /* ---- Responsive ---- */
+
+@media (max-width: 900px) {
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 @media (max-width: 600px) {
   .flip-container {
@@ -472,6 +705,9 @@ footer a:hover {
   .nav-links a:not(.gh-btn) {
     display: none;
   }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 </head>
@@ -482,6 +718,7 @@ footer a:hover {
   <div class="nav-links">
     <a href="#how-it-works">How it works</a>
     <a href="#runners">Runners</a>
+    <a href="#pricing">Pricing</a>
     <a href="https://github.com/matthewmoran/sorta.fit" class="gh-btn">
       <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
@@ -631,6 +868,108 @@ footer a:hover {
   </div>
 </section>
 
+<!-- Pricing -->
+<section class="pricing-section" id="pricing">
+  <div class="section-label">Pricing</div>
+  <div class="section-title">Start free. Scale when you're ready.</div>
+  <p class="section-desc">The full pipeline is free and open source. Paid tiers add control, visibility, and team features.</p>
+
+  <div class="pricing-grid">
+    <div class="pricing-card" data-reveal>
+      <div class="pricing-tier">Community</div>
+      <div class="pricing-price">Free</div>
+      <div class="pricing-desc">Open source, run it yourself</div>
+      <ul class="pricing-features">
+        <li>All runners included</li>
+        <li>Single repo</li>
+        <li>CLI interface</li>
+        <li>All board adapters</li>
+        <li>Community support</li>
+      </ul>
+      <a href="https://github.com/matthewmoran/sorta.fit" class="pricing-cta">Get Started</a>
+    </div>
+
+    <div class="pricing-card featured" data-reveal>
+      <div class="pricing-tier">Dev+</div>
+      <div class="pricing-price">$20<span>/mo</span></div>
+      <div class="pricing-desc">1 seat</div>
+      <ul class="pricing-features">
+        <li>Everything in Community</li>
+        <li>Local dashboard</li>
+        <li>Git safety controls</li>
+        <li>Smart retry &amp; failure classification</li>
+        <li>Dry-run mode</li>
+        <li>Prompt versioning &amp; rollback</li>
+      </ul>
+      <button class="pricing-cta pricing-cta-primary" data-tier="devplus" data-label="Get Started with Dev+">Get Started</button>
+    </div>
+
+    <div class="pricing-card" data-reveal>
+      <div class="pricing-tier">Team</div>
+      <div class="pricing-price">$30<span>/seat/mo</span></div>
+      <div class="pricing-desc">3 seat minimum</div>
+      <ul class="pricing-features">
+        <li>Everything in Dev+</li>
+        <li>Multi-repo support</li>
+        <li>Parallel card processing</li>
+        <li>Dependency chain detection</li>
+        <li>BYOK (bring your own API key)</li>
+        <li>Slack / Teams notifications</li>
+        <li>Hosted team dashboard &amp; analytics</li>
+        <li>Human-in-the-loop gates</li>
+        <li>Shared team configs</li>
+        <li>Priority support</li>
+      </ul>
+      <button class="pricing-cta" data-tier="team" data-label="Join the Team Waitlist">Join Waitlist</button>
+    </div>
+
+    <div class="pricing-card" data-reveal>
+      <div class="pricing-tier">Enterprise</div>
+      <div class="pricing-price">Custom</div>
+      <div class="pricing-desc">Unlimited seats</div>
+      <ul class="pricing-features">
+        <li>Everything in Team</li>
+        <li>SSO / SAML / OIDC</li>
+        <li>RBAC &amp; team isolation</li>
+        <li>Full audit trail</li>
+        <li>Policy &amp; governance engine</li>
+        <li>On-prem / VPC deployment</li>
+        <li>Custom adapter development</li>
+        <li>Dedicated support &amp; SLA</li>
+        <li>API access</li>
+      </ul>
+      <button class="pricing-cta" data-tier="enterprise" data-label="Contact Sales">Contact Sales</button>
+    </div>
+  </div>
+
+  <div class="pricing-form-overlay" id="pricingFormOverlay">
+    <div class="pricing-form-box">
+      <button class="pricing-form-close" id="pricingFormClose">&times;</button>
+      <div class="pricing-form-title" id="pricingFormTitle"></div>
+      <form id="pricingForm">
+        <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_KEY">
+        <input type="hidden" name="subject" value="Sorta.Fit Pricing Interest">
+        <input type="hidden" name="from_name" value="Sorta.Fit Pricing Page">
+        <input type="hidden" name="tier" id="formTier" value="">
+        <div class="form-group">
+          <input type="text" name="name" placeholder="Name" required>
+        </div>
+        <div class="form-group">
+          <input type="email" name="email" placeholder="Email" required>
+        </div>
+        <div class="form-group">
+          <input type="text" name="company" placeholder="Company (optional)">
+        </div>
+        <div class="form-group">
+          <input type="number" name="team_size" placeholder="Team size" min="1">
+        </div>
+        <button type="submit" class="pricing-cta pricing-cta-primary pricing-form-submit">Submit</button>
+      </form>
+      <div class="pricing-form-success" id="pricingFormSuccess">Thanks! We'll be in touch soon.</div>
+    </div>
+  </div>
+</section>
+
 <!-- Quick Start -->
 <section class="start-section" id="start">
   <div class="section-label">Quick start</div>
@@ -705,6 +1044,70 @@ footer a:hover {
 
   reveals.forEach(function(el) {
     observer.observe(el);
+  });
+
+  // ---- Pricing form ----
+  var overlay = document.getElementById("pricingFormOverlay");
+  var formEl = document.getElementById("pricingForm");
+  var formTitle = document.getElementById("pricingFormTitle");
+  var formTier = document.getElementById("formTier");
+  var formSuccess = document.getElementById("pricingFormSuccess");
+  var formClose = document.getElementById("pricingFormClose");
+
+  function openForm(tier, label) {
+    formTitle.textContent = label;
+    formTier.value = tier;
+    formEl.style.display = "";
+    formSuccess.classList.remove("active");
+    formEl.reset();
+    overlay.classList.add("active");
+  }
+
+  function closeForm() {
+    overlay.classList.remove("active");
+  }
+
+  document.querySelectorAll("button[data-tier]").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      openForm(btn.getAttribute("data-tier"), btn.getAttribute("data-label"));
+    });
+  });
+
+  formClose.addEventListener("click", closeForm);
+
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) closeForm();
+  });
+
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeForm();
+  });
+
+  formEl.addEventListener("submit", function(e) {
+    e.preventDefault();
+    var data = new FormData(formEl);
+    var submitBtn = formEl.querySelector(".pricing-form-submit");
+    submitBtn.textContent = "Sending...";
+    submitBtn.disabled = true;
+
+    fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      body: data
+    }).then(function(res) {
+      return res.json();
+    }).then(function(result) {
+      if (result.success) {
+        formEl.style.display = "none";
+        formSuccess.classList.add("active");
+        setTimeout(closeForm, 2500);
+      } else {
+        submitBtn.textContent = "Try again";
+        submitBtn.disabled = false;
+      }
+    }).catch(function() {
+      submitBtn.textContent = "Try again";
+      submitBtn.disabled = false;
+    });
   });
 })();
 </script>
