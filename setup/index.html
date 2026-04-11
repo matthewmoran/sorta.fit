@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="session-token" content="{{SESSION_TOKEN}}">
+<title>Sorta.Fit - Setup Wizard</title>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --success: #3fb950;
+  --error: #f85149;
+  --warning: #d29922;
+  --input-bg: #0d1117;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Step indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.step-dot-group {
+  display: flex;
+  align-items: center;
+}
+
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--card);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.step-dot.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.step-dot.completed {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+
+.step-line {
+  width: 24px;
+  height: 2px;
+  background: var(--border);
+  transition: background 0.3s ease;
+  flex-shrink: 0;
+}
+
+.step-line.completed {
+  background: var(--success);
+}
+
+/* Card */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.card p {
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.card p.description {
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #484f58;
+}
+
+.btn-success {
+  background: var(--success);
+  color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #46c258;
+}
+
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fa6a63;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  gap: 12px;
+}
+
+.btn-row-right {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.form-group .hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+select option {
+  background: var(--card);
+  color: var(--text);
+}
+
+select option:disabled {
+  color: var(--text-muted);
+}
+
+/* Checklist */
+.checklist {
+  list-style: none;
+  margin: 16px 0;
+}
+
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: var(--bg);
+}
+
+.checklist li .status-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.checklist li .dep-name {
+  font-weight: 600;
+  min-width: 90px;
+}
+
+.checklist li .dep-version {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.status-pending { color: var(--warning); }
+.status-ok { color: var(--success); }
+.status-fail { color: var(--error); }
+
+/* Status dot */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.dot-green { background: var(--success); }
+.dot-red { background: var(--error); }
+.dot-yellow { background: var(--warning); }
+
+/* Inline messages */
+.msg {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 12px;
+  display: none;
+}
+
+.msg.visible {
+  display: block;
+}
+
+.msg-success {
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  color: var(--success);
+}
+
+.msg-error {
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  color: var(--error);
+}
+
+.msg-info {
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  color: var(--accent);
+}
+
+/* Summary table */
+.summary-section {
+  margin-bottom: 20px;
+}
+
+.summary-section h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.summary-table td {
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.summary-table td:first-child {
+  color: var(--text-muted);
+  width: 180px;
+  padding-right: 16px;
+}
+
+/* Checkboxes */
+.checkbox-group {
+  margin: 16px 0;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.checkbox-item:hover {
+  border-color: var(--accent);
+}
+
+.checkbox-item input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.checkbox-item .runner-info {
+  flex: 1;
+}
+
+.checkbox-item .runner-name {
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+}
+
+.checkbox-item .runner-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+/* Pipeline diagram */
+.pipeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 20px 0;
+  flex-wrap: wrap;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.pipeline-node {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.pipeline-node.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pipeline-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 50px;
+}
+
+.pipeline-arrow .arrow-line {
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  margin: 2px 0;
+}
+
+.pipeline-arrow .arrow-line::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border: 5px solid transparent;
+  border-left-color: var(--border);
+}
+
+.pipeline-arrow .arrow-label {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pipeline-arrow .arrow-label.human {
+  color: var(--warning);
+}
+
+.pipeline-node.human-gate {
+  border-color: var(--warning);
+  border-style: dashed;
+  color: var(--warning);
+  font-size: 11px;
+}
+
+/* Dashboard */
+
+
+
+
+/* Dashboard grid */
+
+
+
+
+
+.rate-limited-banner {
+  border: 1px solid var(--warning);
+  background: rgba(210, 153, 34, 0.1);
+  color: var(--warning);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.dot-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.runner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.runner-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.runner-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cycle-summary {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.cycle-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cycle-runner-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.events-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.events-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.header .tagline {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .card {
+    padding: 20px;
+  }
+  .step-dot {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+  .step-line {
+    width: 12px;
+  }
+  .btn-row {
+    flex-direction: column;
+  }
+  .btn-row-right {
+    margin-left: 0;
+    width: 100%;
+  }
+  .btn-row-right .btn {
+    flex: 1;
+  }
+  .pipeline {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pipeline-arrow {
+    transform: rotate(90deg);
+    min-width: 30px;
+  }
+}
+
+/* Log viewer modal */
+.log-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.log-overlay.visible {
+  display: flex;
+}
+.log-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease;
+}
+.log-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.log-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.log-modal-header .log-actions {
+  display: flex;
+  gap: 8px;
+}
+.log-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  min-height: 200px;
+}
+.log-modal-body pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+.log-modal-body .log-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 40px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Sorta.Fit</h1>
+    <div class="tagline">AI-powered sprint automation</div>
+  </div>
+  <div class="step-indicator" id="stepIndicator"></div>
+  <div class="card" id="wizardCard"></div>
+</div>
+
+<div class="log-overlay" id="logOverlay">
+  <div class="log-modal">
+    <div class="log-modal-header">
+      <h3>Runner Logs</h3>
+      <div class="log-actions">
+        <button class="btn btn-secondary" onclick="window._wizRefreshLogs()" style="padding:6px 12px;font-size:13px">Refresh</button>
+        <button class="btn btn-secondary" onclick="window._wizCloseLogs()" style="padding:6px 12px;font-size:13px">Close</button>
+      </div>
+    </div>
+    <div class="log-modal-body" id="logContent">
+      <div class="log-empty">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  var STEPS = [
+    { label: "Welcome" },
+    { label: "Dependencies" },
+    { label: "Board" },
+    { label: "Runners" },
+    { label: "Configure" },
+    { label: "Git" },
+    { label: "Review" },
+    { label: "Running" }
+  ];
+
+  var RUNNER_DEFS = [
+    { id: "refine", name: "Refine", desc: "Break down cards into acceptance criteria and specs using AI analysis." },
+    { id: "architect", name: "Architect", desc: "Analyze codebase and enrich refined specs with implementation plans." },
+    { id: "code", name: "Code", desc: "Implement cards in isolated worktrees, open PRs automatically." },
+    { id: "review", name: "Review", desc: "Review PR diffs and post structured feedback on GitHub." },
+    { id: "triage", name: "Triage", desc: "Analyze bug reports, identify root causes, write triage reports." },
+    { id: "bounce", name: "Bounce", desc: "Move cards with rejected PR reviews back for automated rework." },
+    { id: "merge", name: "Merge", desc: "Merge approved PRs and transition cards to Done." },
+    { id: "documenter", name: "Documenter", desc: "Generate and maintain project docs from card specs." }
+  ];
+
+  var state = {
+    currentStep: 0,
+    deps: null,
+    connectionTested: false,
+    boardDiscovered: false,
+    discoveredStatuses: [],
+    discoveredTransitions: [],
+    config: {
+      adapter: "jira",
+      domain: "",
+      email: "",
+      apiToken: "",
+      projectKey: "",
+      targetRepo: "",
+      baseBranch: "main",
+      pollInterval: 60,
+      claudeAgent: "",
+      runners: ["refine", "code"],
+      routing: {
+        refine:    { fromId: "", toId: "", maxCards: 5, agent: "" },
+        architect: { fromId: "", toId: "", maxCards: 5, agent: "" },
+        code:      { fromId: "", toId: "", maxCards: 2, agent: "" },
+        review:  { fromId: "", toId: "", toRejectedId: "", maxCards: 10, agent: "" },
+        triage:  { fromId: "", toId: "", maxCards: 5, agent: "" },
+        bounce:  { fromId: "", toId: "", maxCards: 10, agent: "" },
+        merge:   { fromId: "", toId: "", maxCards: 10, agent: "" },
+        documenter: { fromId: "", toId: "", maxCards: 5, agent: "" }
+      }
+    },
+    runner: {
+      running: false,
+      pid: null,
+      pollTimer: null,
+    }
+  };
+
+  // ---- Utilities ----
+
+  function $(sel, parent) {
+    return (parent || document).querySelector(sel);
+  }
+
+  function escHtml(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function showMsg(id, type, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = "msg visible msg-" + type;
+    el.textContent = text;
+  }
+
+  function hideMsg(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = "msg";
+    el.textContent = "";
+  }
+
+  async function apiPost(url, data) {
+    var token = document.querySelector('meta[name="session-token"]').content;
+    var resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify(data || {})
+    });
+    if (!resp.ok) {
+      var errText = "";
+      try { errText = (await resp.json()).error || resp.statusText; }
+      catch(e) { errText = resp.statusText; }
+      throw new Error(errText);
+    }
+    return resp.json();
+  }
+
+  function statusName(id) {
+    for (var i = 0; i < state.discoveredStatuses.length; i++) {
+      if (state.discoveredStatuses[i].id === id) return state.discoveredStatuses[i].name;
+    }
+    return id || "(none)";
+  }
+
+  // ---- Step indicator ----
+
+  function renderStepIndicator() {
+    var html = "";
+    for (var i = 0; i < STEPS.length; i++) {
+      var cls = "step-dot";
+      if (i < state.currentStep) cls += " completed";
+      else if (i === state.currentStep) cls += " active";
+      var inner = (i < state.currentStep) ? "&#10003;" : String(i + 1);
+      html += '<div class="step-dot-group">';
+      html += '<div class="' + cls + '" title="' + escHtml(STEPS[i].label) + '">' + inner + '</div>';
+      if (i < STEPS.length - 1) {
+        var lineCls = "step-line" + (i < state.currentStep ? " completed" : "");
+        html += '<div class="' + lineCls + '"></div>';
+      }
+      html += '</div>';
+    }
+    document.getElementById("stepIndicator").innerHTML = html;
+  }
+
+  // ---- Navigation ----
+
+  function goNext() {
+    if (state.currentStep < STEPS.length - 1) {
+      state.currentStep++;
+      render();
+    }
+  }
+
+  function goBack() {
+    if (state.currentStep > 0) {
+      state.currentStep--;
+      render();
+    }
+  }
+
+  function backBtn() {
+    return '<button class="btn btn-secondary" onclick="window._wizBack()">Back</button>';
+  }
+
+  window._wizBack = goBack;
+
+  // ---- Step 0: Welcome ----
+
+  function renderWelcome() {
+    return '' +
+      '<h2>Welcome to Sorta.Fit</h2>' +
+      '<p class="description">' +
+        'Sorta.Fit connects your issue board to Claude Code for autonomous sprint execution. ' +
+        'It polls your board, picks up cards, and runs them through a configurable pipeline: ' +
+        'spec refinement, implementation in isolated worktrees, PR creation, code review, and bug triage.' +
+      '</p>' +
+      '<p class="description">' +
+        'It runs in the background on your computer -- as long as it\'s on, your board keeps moving. ' +
+        'Configure human review gates where you need them, or let it handle everything.' +
+      '</p>' +
+      '<p class="description" style="margin-bottom:0;font-size:13px;color:var(--text-muted)">' +
+        'Sorta.Fit runs from inside your project repository so it can read your code, run your tests, and commit to branches. ' +
+        'Drop the <code style="background:var(--bg);padding:2px 6px;border-radius:3px">sorta-fit</code> folder into your repo and run the setup from there.' +
+      '</p>' +
+      '<div class="btn-row">' +
+        '<div class="btn-row-right">' +
+          '<button class="btn btn-primary" onclick="window._wizNext0()">Get Started</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  window._wizNext0 = goNext;
+
+  // ---- Step 1: Check Dependencies ----
+
+  function renderDeps() {
+    var items = ["git", "node", "claude", "gh"];
+    // git-bash is added by the server on Windows
+    if (state.deps && state.deps["git-bash"]) {
+      items.push("git-bash");
+    }
+    var labels = { git: "Git", node: "Node.js", claude: "Claude CLI", gh: "GitHub CLI", "git-bash": "Git Bash (Windows)" };
+    var html = '<h2>Check Dependencies</h2>' +
+      '<p>Verifying that all required tools are installed on this system.</p>' +
+      '<ul class="checklist" id="depList">';
+    for (var i = 0; i < items.length; i++) {
+      var key = items[i];
+      var icon, iconCls, version;
+      if (!state.deps) {
+        icon = "...";
+        iconCls = "status-pending";
+        version = "checking";
+      } else {
+        var d = state.deps[key];
+        if (d && d.found) {
+          icon = "&#10003;";
+          iconCls = "status-ok";
+          version = d.version || "found";
+        } else {
+          icon = "&#10007;";
+          iconCls = "status-fail";
+          version = "not found";
+        }
+      }
+      html += '<li>' +
+        '<span class="status-icon ' + iconCls + '">' + icon + '</span>' +
+        '<span class="dep-name">' + escHtml(labels[key]) + '</span>' +
+        '<span class="dep-version">' + escHtml(version) + '</span>' +
+        '</li>';
+    }
+    html += '</ul>';
+    html += '<div id="depMsg" class="msg"></div>';
+
+    var allOk = state.deps && state.deps.git && state.deps.git.found &&
+                state.deps.node && state.deps.node.found &&
+                state.deps.claude && state.deps.claude.found &&
+                state.deps.gh && state.deps.gh.found &&
+                (!state.deps["git-bash"] || state.deps["git-bash"].found);
+
+    html += '<div class="btn-row">' +
+      backBtn() +
+      '<div class="btn-row-right">' +
+        '<button class="btn btn-secondary" onclick="window._wizCheckDeps()">Re-check</button>' +
+        '<button class="btn btn-primary" ' + (allOk ? '' : 'disabled') + ' onclick="window._wizNext1()">Next</button>' +
+      '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizCheckDeps = async function() {
+    state.deps = null;
+    renderCard();
+    try {
+      var data = await apiPost("/api/check-dependencies");
+      var depMap = {};
+      if (data.dependencies) {
+        for (var j = 0; j < data.dependencies.length; j++) {
+          depMap[data.dependencies[j].name] = data.dependencies[j];
+        }
+      }
+      state.deps = depMap;
+      renderCard();
+    } catch(e) {
+      state.deps = {};
+      renderCard();
+      var hint = e.message === "Failed to fetch" ? " -- is the setup server running?" : "";
+      showMsg("depMsg", "error", "Failed to check dependencies: " + e.message + hint);
+    }
+  };
+
+  window._wizNext1 = goNext;
+
+  // ---- Step 2: Board Connection + Discovery ----
+
+  function renderBoard() {
+    var c = state.config;
+    var html = '<h2>Connect Board</h2>' +
+      '<p>Configure the connection to your issue board. After testing the connection, we\'ll discover your board\'s statuses and transitions.</p>' +
+      '<div class="form-group">' +
+        '<label for="adapter">Adapter</label>' +
+        '<select id="adapter" onchange="window._wizBoardField(\'adapter\', this.value)">' +
+          '<option value="jira"' + (c.adapter === "jira" ? " selected" : "") + '>Jira</option>' +
+          '<option value="linear"' + (c.adapter === "linear" ? " selected" : "") + '>Linear</option>' +
+          '<option value="github-issues"' + (c.adapter === "github-issues" ? " selected" : "") + '>GitHub Issues</option>' +
+        '</select>' +
+      '</div>' +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="domain">Board Domain</label>' +
+          '<span class="hint">e.g. yourteam.atlassian.net</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain) + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+      c.adapter === 'linear' ?
+        '<div class="form-group">' +
+          '<label for="domain">API Endpoint</label>' +
+          '<span class="hint">Default: api.linear.app</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'api.linear.app') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+        '<div class="form-group">' +
+          '<label for="domain">GitHub Domain</label>' +
+          '<span class="hint">Default: github.com</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'github.com') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>') +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="email">Email</label>' +
+          '<input type="email" id="email" value="' + escHtml(c.email) + '" onchange="window._wizBoardField(\'email\', this.value)" />' +
+        '</div>' : '') +
+      '<div class="form-group">' +
+        '<label for="apiToken">API Token</label>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'Atlassian API token' : c.adapter === 'linear' ? 'Linear API key (Settings &rarr; API)' : 'GitHub personal access token') + '</span>' +
+        '<input type="password" id="apiToken" value="' + escHtml(c.apiToken) + '" onchange="window._wizBoardField(\'apiToken\', this.value)" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label for="projectKey">Project Key</label>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'e.g. PROJ' : c.adapter === 'linear' ? 'Team key, e.g. ENG' : 'owner/repo, e.g. acme/my-project') + '</span>' +
+        '<input type="text" id="projectKey" value="' + escHtml(c.projectKey) + '" onchange="window._wizBoardField(\'projectKey\', this.value)" />' +
+      '</div>' +
+      '<div style="display:flex;gap:12px">' +
+        '<button class="btn btn-secondary" onclick="window._wizTestConn()">Test Connection</button>' +
+        '<button class="btn btn-secondary" onclick="window._wizDiscover()"' +
+          (state.connectionTested ? '' : ' disabled') + '>Discover Board</button>' +
+      '</div>' +
+      '<div id="connMsg" class="msg"></div>';
+
+    if (state.boardDiscovered && state.discoveredStatuses.length > 0) {
+      html += '<div style="margin-top:16px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px">' +
+        '<div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--success)">Board discovered</div>' +
+        '<div style="font-size:12px;color:var(--text-muted)">' +
+          state.discoveredStatuses.length + ' statuses, ' +
+          state.discoveredTransitions.length + ' transitions found' +
+        '</div>' +
+        '<details style="margin-top:8px;font-size:12px;color:var(--text-muted)">' +
+          '<summary style="cursor:pointer;color:var(--accent)">View details</summary>' +
+          '<div style="margin-top:8px;display:flex;gap:24px;flex-wrap:wrap">' +
+            '<div><strong style="color:var(--text)">Statuses</strong><br>';
+      for (var s = 0; s < state.discoveredStatuses.length; s++) {
+        html += escHtml(state.discoveredStatuses[s].name + ' (' + state.discoveredStatuses[s].id + ')') + '<br>';
+      }
+      html += '</div>';
+      if (state.discoveredTransitions.length > 0) {
+        html += '<div><strong style="color:var(--text)">Transitions</strong><br>';
+        for (var t = 0; t < state.discoveredTransitions.length; t++) {
+          var tr = state.discoveredTransitions[t];
+          html += escHtml(tr.name + ' -> ' + tr.toName + ' (id:' + tr.id + ')') + '<br>';
+        }
+        html += '</div>';
+      }
+      html += '</div></details></div>';
+    }
+
+    var canProceed = state.connectionTested && state.boardDiscovered;
+    var hint = '';
+    if (!state.connectionTested) {
+      hint = '<span style="font-size:12px;color:var(--text-muted)">Test your connection to continue</span>';
+    } else if (!state.boardDiscovered) {
+      hint = '<span style="font-size:12px;color:var(--text-muted)">Discover your board to continue</span>';
+    }
+    html += '<div class="btn-row">' +
+      backBtn() +
+      '<div class="btn-row-right" style="align-items:center">' +
+        hint +
+        '<button class="btn btn-primary" ' + (canProceed ? '' : 'disabled') + ' onclick="window._wizNext2()">Next</button>' +
+      '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizBoardField = function(field, val) {
+    state.config[field] = val;
+    state.connectionTested = false;
+    state.boardDiscovered = false;
+    if (field === 'adapter') {
+      var defaults = { jira: '', linear: 'api.linear.app', 'github-issues': 'github.com' };
+      state.config.domain = defaults[val] || '';
+      if (val !== 'jira') state.config.email = '';
+      renderCard();
+    }
+  };
+
+  window._wizTestConn = async function() {
+    var c = state.config;
+    hideMsg("connMsg");
+    var missingFields = !c.domain || !c.projectKey;
+    if (c.adapter !== 'github-issues') missingFields = missingFields || !c.apiToken;
+    if (c.adapter === 'jira') missingFields = missingFields || !c.email;
+    if (missingFields) {
+      showMsg("connMsg", "error", "Please fill in all fields before testing the connection.");
+      return;
+    }
+    showMsg("connMsg", "info", "Testing connection...");
+    try {
+      var result = await apiPost("/api/test-connection", {
+        adapter: c.adapter,
+        domain: c.domain,
+        email: c.email,
+        token: c.apiToken,
+        projectKey: c.projectKey
+      });
+      if (!result.success) {
+        state.connectionTested = false;
+        showMsg("connMsg", "error", result.message || "Connection failed.");
+        return;
+      }
+      state.connectionTested = true;
+      renderCard();
+      showMsg("connMsg", "success", result.message + " -- now click Discover Board.");
+    } catch(e) {
+      state.connectionTested = false;
+      showMsg("connMsg", "error", "Connection failed: " + e.message);
+    }
+  };
+
+  window._wizDiscover = async function() {
+    hideMsg("connMsg");
+    showMsg("connMsg", "info", "Discovering board configuration...");
+    try {
+      var data = await apiPost("/api/discover-board", {
+        adapter: state.config.adapter,
+        domain: state.config.domain,
+        email: state.config.email,
+        token: state.config.apiToken,
+        projectKey: state.config.projectKey
+      });
+      if (!data.success) {
+        showMsg("connMsg", "error", data.message || "Discovery failed.");
+        return;
+      }
+      state.discoveredStatuses = data.statuses || [];
+      state.discoveredTransitions = data.transitions || [];
+      state.boardDiscovered = true;
+      renderCard();
+      showMsg("connMsg", "success", "Board discovered. Click Next to configure runners.");
+    } catch(e) {
+      showMsg("connMsg", "error", "Discovery failed: " + e.message);
+    }
+  };
+
+  window._wizNext2 = goNext;
+
+  // ---- Step 3: Select Runners ----
+
+  function renderSelectRunners() {
+    var selected = state.config.runners;
+
+    var html = '<h2>Select Runners</h2>' +
+      '<p>Choose which automation runners to enable. You\'ll configure their lanes and limits in the next step.</p>' +
+      '<div class="checkbox-group">';
+
+    for (var i = 0; i < RUNNER_DEFS.length; i++) {
+      var r = RUNNER_DEFS[i];
+      var checked = selected.indexOf(r.id) !== -1;
+      html += '<div class="checkbox-item">' +
+        '<input type="checkbox" value="' + r.id + '"' + (checked ? " checked" : "") +
+          ' onchange="window._wizToggleRunner(\'' + r.id + '\', this.checked)" style="cursor:pointer" />' +
+        '<div class="runner-info">' +
+          '<span class="runner-name">' + escHtml(r.name) + '</span>' +
+          '<span class="runner-desc">' + escHtml(r.desc) + '</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    html += '</div>' +
+      '<div id="runnerSelectMsg" class="msg"></div>' +
+      '<div class="btn-row">' +
+        backBtn() +
+        '<div class="btn-row-right">' +
+          '<button class="btn btn-primary" onclick="window._wizNext3()">Next</button>' +
+        '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizToggleRunner = function(id, checked) {
+    var idx = state.config.runners.indexOf(id);
+    if (checked && idx === -1) {
+      state.config.runners.push(id);
+    } else if (!checked && idx !== -1) {
+      state.config.runners.splice(idx, 1);
+    }
+    renderCard();
+  };
+
+  window._wizNext3 = function() {
+    if (state.config.runners.length === 0) {
+      showMsg("runnerSelectMsg", "error", "Please select at least one runner.");
+      return;
+    }
+    goNext();
+  };
+
+  // ---- Step 4: Configure Runners ----
+
+  function findStatusIdByRole(role) {
+    var roleToNames = {
+      "TODO": ["to do", "todo", "open"],
+      "REFINED": ["refined", "ready for dev", "ready"],
+      "AGENT": ["agent", "selected for development"],
+      "QA": ["qa", "in review", "review", "code review"],
+      "DONE": ["done", "closed", "resolved"]
+    };
+    var names = roleToNames[role] || [];
+    for (var i = 0; i < state.discoveredStatuses.length; i++) {
+      var s = state.discoveredStatuses[i];
+      if (names.indexOf(s.name.toLowerCase()) !== -1) return s.id;
+    }
+    return "";
+  }
+
+  function statusDropdown(selectedId, onchangeAttr) {
+    var html = '<select onchange="' + onchangeAttr + '" style="font-size:13px">' +
+      '<option value="">(none)</option>';
+    for (var i = 0; i < state.discoveredStatuses.length; i++) {
+      var s = state.discoveredStatuses[i];
+      var sel = (s.id === selectedId) ? " selected" : "";
+      html += '<option value="' + escHtml(s.id) + '"' + sel + '>' + escHtml(s.name) + '</option>';
+    }
+    if (selectedId && !state.discoveredStatuses.some(function(s) { return s.id === selectedId; })) {
+      html += '<option value="' + escHtml(selectedId) + '" selected>' + escHtml(selectedId) + ' (unknown)</option>';
+    }
+    html += '</select>';
+    return html;
+  }
+
+  function renderPipeline() {
+    // Build the pipeline from the runner routing, including human gates
+    var runners = state.config.runners;
+    var routing = state.config.routing;
+
+    // Define the main pipeline flow with human gates
+    // Order: refine output -> human gate -> code input -> code output -> review -> human gate -> done
+    var steps = []; // { type: "status"|"human", id, label, runner }
+
+    // Build edges from active runners
+    var edges = [];
+    var runnerOrder = ["refine", "architect", "code", "review", "merge", "documenter"];
+    for (var i = 0; i < runnerOrder.length; i++) {
+      var rid = runnerOrder[i];
+      if (runners.indexOf(rid) === -1) continue;
+      var route = routing[rid];
+      if (route.fromId) {
+        edges.push({ from: route.fromId, to: route.toId, runner: rid });
+      }
+    }
+
+    if (edges.length === 0) {
+      return '<div class="pipeline"><span style="color:var(--text-muted);font-size:13px">Configure runners below to see the pipeline</span></div>';
+    }
+
+    // Build ordered node list with human gates inserted
+    var seen = {};
+    for (var ei = 0; ei < edges.length; ei++) {
+      var edge = edges[ei];
+
+      if (!seen[edge.from]) {
+        seen[edge.from] = true;
+        steps.push({ type: "status", id: edge.from });
+      }
+
+      steps.push({ type: "arrow", runner: edge.runner });
+
+      var toId = edge.to || edge.from; // review stays in same lane
+      if (!seen[toId]) {
+        seen[toId] = true;
+        steps.push({ type: "status", id: toId });
+      }
+
+      // Check if there's a gap between this edge's output and the next edge's input (human gate)
+      if (ei < edges.length - 1) {
+        var nextFrom = edges[ei + 1].from;
+        if (toId !== nextFrom && !seen[nextFrom]) {
+          steps.push({ type: "arrow", runner: "human" });
+          seen[nextFrom] = true;
+          steps.push({ type: "status", id: nextFrom });
+        }
+      }
+    }
+
+    // Add final human gate to Done if we have a "Done" status discovered
+    var doneId = findStatusIdByRole("DONE");
+    if (doneId && !seen[doneId]) {
+      steps.push({ type: "arrow", runner: "human" });
+      steps.push({ type: "status", id: doneId });
+    }
+
+    var html = '<div class="pipeline">';
+    for (var si = 0; si < steps.length; si++) {
+      var step = steps[si];
+      if (step.type === "status") {
+        html += '<div class="pipeline-node active">' + escHtml(statusName(step.id)) + '</div>';
+      } else if (step.type === "arrow") {
+        var isHuman = step.runner === "human";
+        var labelCls = isHuman ? "arrow-label human" : "arrow-label";
+        var label = isHuman ? "you" : step.runner;
+        html += '<div class="pipeline-arrow">' +
+          '<span class="' + labelCls + '">' + escHtml(label) + '</span>' +
+          '<div class="arrow-line"></div>' +
+        '</div>';
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderConfigureRunners() {
+    var runners = state.config.runners;
+    var routing = state.config.routing;
+
+    var html = '<h2>Configure Runners</h2>' +
+      '<p>Set the pickup and result lanes for each runner, and the max cards per cycle.</p>' +
+      '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
+        '<button class="btn btn-secondary" onclick="window._wizSuggestedHumanGates()" style="flex:1;min-width:200px">' +
+          'Human gates (recommended)' +
+        '</button>' +
+        '<button class="btn btn-secondary" onclick="window._wizSuggestedAutonomous()" style="flex:1;min-width:200px;position:relative">' +
+          'Fully autonomous' +
+          '<span style="font-size:10px;color:var(--warning);margin-left:6px">(WIP)</span>' +
+        '</button>' +
+      '</div>' +
+      '<div id="configMsg" class="msg"></div>';
+
+    // Pipeline diagram
+    html += renderPipeline();
+
+    // Per-runner configuration
+    for (var i = 0; i < RUNNER_DEFS.length; i++) {
+      var r = RUNNER_DEFS[i];
+      if (runners.indexOf(r.id) === -1) continue;
+      var route = routing[r.id];
+
+      html += '<div style="border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:12px;background:var(--bg)">' +
+        '<div style="font-weight:600;font-size:14px;margin-bottom:12px">' + escHtml(r.name) +
+          '<span style="font-weight:400;font-size:12px;color:var(--text-muted);margin-left:8px">' + escHtml(r.desc) + '</span></div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Pickup lane</label>' +
+            statusDropdown(route.fromId, "window._wizRunnerRouteField('" + r.id + "','fromId',this.value)") +
+          '</div>' +
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">' +
+              (r.id === 'review' ? 'Approved lane' : 'Result lane') + '</label>' +
+            statusDropdown(route.toId, "window._wizRunnerRouteField('" + r.id + "','toId',this.value)") +
+          '</div>' +
+          (r.id === 'review' ?
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Rejected lane</label>' +
+            statusDropdown(route.toRejectedId || '', "window._wizRunnerRouteField('" + r.id + "','toRejectedId',this.value)") +
+          '</div>' : '') +
+          '<div style="width:120px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Max cards</label>' +
+            '<input type="number" value="' + (route.maxCards || 5) + '" min="1" style="font-size:13px" ' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
+          '</div>' +
+          (r.id !== "bounce" && r.id !== "merge" ?
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Claude Agent</label>' +
+            '<input type="text" value="' + escHtml(route.agent || '') + '" placeholder="(optional)" style="font-size:13px" ' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'agent\',this.value)" />' +
+          '</div>' : '') +
+        '</div>' +
+      '</div>';
+    }
+
+    html += '<div class="btn-row">' +
+      backBtn() +
+      '<div class="btn-row-right">' +
+        '<button class="btn btn-primary" onclick="window._wizNext4()">Next</button>' +
+      '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizRunnerRouteField = function(runner, field, val) {
+    state.config.routing[runner][field] = val;
+    renderCard();
+  };
+
+  function applySuggestedSetup(mode) {
+    var todoId = findStatusIdByRole("TODO");
+    var refinedId = findStatusIdByRole("REFINED");
+    var agentId = findStatusIdByRole("AGENT");
+    var qaId = findStatusIdByRole("QA");
+    var doneId = findStatusIdByRole("DONE");
+
+    if (!todoId || !refinedId || !agentId || !qaId) {
+      showMsg("configMsg", "error", "Could not auto-match all lanes. Your board may use different status names. Configure manually below.");
+      return;
+    }
+    if (!doneId) {
+      showMsg("configMsg", "error", "Could not find a 'Done' status. Documenter and merge lanes need to be configured manually below.");
+    }
+
+    if (mode === "human-gates") {
+      // Human gates: Refined->Agent is manual, QA->Done is manual
+      state.config.routing.refine = { fromId: todoId, toId: refinedId, maxCards: 5 };
+      state.config.routing.code = { fromId: agentId, toId: qaId, maxCards: 2 };
+      state.config.routing.review = { fromId: qaId, toId: "", maxCards: 10 };
+      state.config.routing.triage = { fromId: todoId, toId: refinedId, maxCards: 5 };
+      state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.merge = { fromId: "", toId: "", maxCards: 10 };
+      state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
+      renderCard();
+      showMsg("configMsg", "success", "Human gates setup applied. You review specs before implementation and PRs before merge.");
+    } else {
+      // Fully autonomous: everything automated end-to-end
+      state.config.routing.refine = { fromId: todoId, toId: agentId, maxCards: 5 };
+      state.config.routing.code = { fromId: agentId, toId: qaId, maxCards: 2 };
+      state.config.routing.review = { fromId: qaId, toId: "", maxCards: 10 };
+      state.config.routing.triage = { fromId: todoId, toId: agentId, maxCards: 5 };
+      state.config.routing.bounce = { fromId: qaId, toId: agentId, maxCards: 10 };
+      state.config.routing.merge = { fromId: qaId, toId: doneId || "", maxCards: 10 };
+      state.config.routing.documenter = { fromId: doneId || "", toId: doneId || "", maxCards: 5 };
+      renderCard();
+      showMsg("configMsg", "info", "Fully autonomous setup applied. The merge runner closes the loop by merging approved PRs.");
+    }
+  }
+
+  window._wizSuggestedHumanGates = function() {
+    applySuggestedSetup("human-gates");
+  };
+
+  window._wizSuggestedAutonomous = function() {
+    applySuggestedSetup("autonomous");
+  };
+
+  window._wizNext4 = function() {
+    var runners = state.config.runners;
+    var routing = state.config.routing;
+    for (var i = 0; i < runners.length; i++) {
+      var rid = runners[i];
+      if (!routing[rid] || !routing[rid].fromId) {
+        showMsg("configMsg", "error", "Please set a pickup lane for " + rid + ".");
+        return;
+      }
+    }
+    goNext();
+  };
+
+  // ---- Step 5: Git Settings ----
+
+  function renderGit() {
+    var c = state.config;
+    var html = '<h2>Git Settings</h2>' +
+      '<p>Configure version control and polling parameters.</p>' +
+      '<div class="form-group">' +
+        '<label for="targetRepo">Target Repository</label>' +
+        '<span class="hint">Absolute path to the project repo sorta.fit will operate on (leave blank to use current directory)</span>' +
+        '<input type="text" id="targetRepo" value="' + escHtml(c.targetRepo) + '" placeholder="/absolute/path/to/your/project" onchange="window._wizGitField(\'targetRepo\', this.value)" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label for="baseBranch">Base Branch</label>' +
+        '<span class="hint">Feature branches will be created from this branch</span>' +
+        '<input type="text" id="baseBranch" value="' + escHtml(c.baseBranch) + '" onchange="window._wizGitField(\'baseBranch\', this.value)" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label for="pollInterval">Poll Interval (minutes)</label>' +
+        '<span class="hint">How often the runner checks for new cards</span>' +
+        '<input type="number" id="pollInterval" value="' + c.pollInterval + '" min="1" onchange="window._wizGitField(\'pollInterval\', parseInt(this.value) || 60)" />' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label for="claudeAgent">Default Claude Agent</label>' +
+        '<span class="hint">Pre-configured Claude Code agent name for all runners (leave blank for CLI default). Per-runner overrides can be set in the Configure step.</span>' +
+        '<input type="text" id="claudeAgent" value="' + escHtml(c.claudeAgent || '') + '" placeholder="(optional)" onchange="window._wizGitField(\'claudeAgent\', this.value)" />' +
+      '</div>' +
+      '<h3 style="margin-top:24px;margin-bottom:8px;">Dependency Detection</h3>' +
+      '<p style="color:var(--text-muted);margin-bottom:16px;">When enabled, the code and architect runners will skip cards with unresolved blocking dependencies (issue links, parent tickets, depends-on labels).</p>' +
+      '<div class="form-group">' +
+        '<label><input type="checkbox" id="depsEnabled" ' + (c.depsEnabled ? 'checked' : '') + ' onchange="window._wizGitField(\'depsEnabled\', this.checked)" /> Enable dependency checking</label>' +
+      '</div>' +
+      '<div id="depsOptions" style="' + (c.depsEnabled ? '' : 'display:none;') + '">' +
+        '<div class="form-group">' +
+          '<label>Done Statuses</label>' +
+          '<span class="hint">Which statuses count as "done" for dependency resolution. If none selected, defaults to the merge runner\'s TO status.</span>' +
+          (function() {
+            var selectedIds = (c.depsDoneStatuses || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            var cbHtml = '';
+            for (var si = 0; si < state.discoveredStatuses.length; si++) {
+              var s = state.discoveredStatuses[si];
+              var checked = selectedIds.indexOf(s.id) !== -1 ? ' checked' : '';
+              cbHtml += '<label style="display:block;margin:4px 0;font-size:13px;cursor:pointer">' +
+                '<input type="checkbox"' + checked + ' onchange="window._wizToggleDoneStatus(\'' + escHtml(s.id) + '\', this.checked)" /> ' +
+                escHtml(s.name) + '</label>';
+            }
+            return cbHtml || '<span style="color:var(--text-muted);font-size:13px">Run board discovery first to see statuses</span>';
+          })() +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label for="depsCommentMode">Comment Mode</label>' +
+          '<span class="hint">When to post "blocked by" comments on cards: first (only once), always, or never.</span>' +
+          '<select id="depsCommentMode" onchange="window._wizGitField(\'depsCommentMode\', this.value)">' +
+            '<option value="first"' + (c.depsCommentMode === 'first' || !c.depsCommentMode ? ' selected' : '') + '>First time only</option>' +
+            '<option value="always"' + (c.depsCommentMode === 'always' ? ' selected' : '') + '>Every check</option>' +
+            '<option value="never"' + (c.depsCommentMode === 'never' ? ' selected' : '') + '>Never</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label><input type="checkbox" id="depsCheckParents" ' + (c.depsCheckParents ? 'checked' : '') + ' onchange="window._wizGitField(\'depsCheckParents\', this.checked)" /> Also check parent tickets</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="btn-row">' +
+        backBtn() +
+        '<div class="btn-row-right">' +
+          '<button class="btn btn-primary" onclick="window._wizNext5()">Next</button>' +
+        '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizGitField = function(field, val) {
+    state.config[field] = val;
+    if (field === 'depsEnabled') {
+      var el = document.getElementById('depsOptions');
+      if (el) el.style.display = val ? '' : 'none';
+    }
+  };
+
+  window._wizToggleDoneStatus = function(statusId, checked) {
+    var current = (state.config.depsDoneStatuses || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    if (checked) {
+      if (current.indexOf(statusId) === -1) current.push(statusId);
+    } else {
+      current = current.filter(function(s) { return s !== statusId; });
+    }
+    state.config.depsDoneStatuses = current.join(',');
+  };
+
+  window._wizNext5 = function() {
+    var c = state.config;
+    if (!c.baseBranch) {
+      alert("Base branch is required.");
+      return;
+    }
+    if (c.pollInterval < 1) {
+      alert("Poll interval must be at least 1 minute.");
+      return;
+    }
+    goNext();
+  };
+
+  // ---- Step 6: Review & Save ----
+
+  function renderReview() {
+    var c = state.config;
+
+    var html = '<h2>Review and Save</h2>' +
+      '<p>Review your configuration before saving.</p>';
+
+    // Board connection
+    html += '<div class="summary-section">' +
+      '<h3>Board Connection</h3>' +
+      '<table class="summary-table">' +
+        '<tr><td>Adapter</td><td>' + escHtml(c.adapter) + '</td></tr>' +
+        '<tr><td>Domain</td><td>' + escHtml(c.domain) + '</td></tr>' +
+        '<tr><td>Email</td><td>' + escHtml(c.email) + '</td></tr>' +
+        '<tr><td>API Token</td><td>' + (c.apiToken ? "********" : "(not set)") + '</td></tr>' +
+        '<tr><td>Project Key</td><td>' + escHtml(c.projectKey) + '</td></tr>' +
+      '</table></div>';
+
+    // Git settings
+    html += '<div class="summary-section">' +
+      '<h3>Git Settings</h3>' +
+      '<table class="summary-table">' +
+        '<tr><td>Target Repository</td><td>' + (c.targetRepo ? escHtml(c.targetRepo) : '(current directory)') + '</td></tr>' +
+        '<tr><td>Base Branch</td><td>' + escHtml(c.baseBranch) + '</td></tr>' +
+        '<tr><td>Poll Interval</td><td>' + c.pollInterval + ' minutes</td></tr>' +
+        (c.claudeAgent ? '<tr><td>Default Claude Agent</td><td>' + escHtml(c.claudeAgent) + '</td></tr>' : '') +
+        '<tr><td>Dependency Detection</td><td>' + (c.depsEnabled ? 'Enabled' : 'Disabled') + '</td></tr>' +
+        (c.depsEnabled && c.depsDoneStatuses ? '<tr><td>Done Statuses</td><td>' + escHtml(c.depsDoneStatuses) + '</td></tr>' : '') +
+        (c.depsEnabled ? '<tr><td>Comment Mode</td><td>' + escHtml(c.depsCommentMode || 'first') + '</td></tr>' : '') +
+        (c.depsEnabled && c.depsCheckParents ? '<tr><td>Check Parents</td><td>Yes</td></tr>' : '') +
+      '</table></div>';
+
+    // Runners & routing
+    html += '<div class="summary-section">' +
+      '<h3>Runners</h3>' +
+      '<table class="summary-table">';
+    for (var ri = 0; ri < (c.runners || []).length; ri++) {
+      var rid = c.runners[ri];
+      var route = (c.routing || {})[rid] || {};
+      var fromName = statusName(route.fromId);
+      var toName = route.toId ? statusName(route.toId) : "(stays)";
+      var agentInfo = route.agent ? ' &mdash; agent: ' + escHtml(route.agent) : '';
+      var rejectedInfo = '';
+      if (rid === 'review' && route.toRejectedId) {
+        rejectedInfo = ' &nbsp; rejected &rarr; ' + escHtml(statusName(route.toRejectedId));
+      }
+      html += '<tr><td>' + escHtml(rid) + '</td><td>' +
+        escHtml(fromName) + ' &rarr; ' + escHtml(toName) +
+        rejectedInfo +
+        ' &nbsp; (max: ' + (route.maxCards || '?') + ')' + agentInfo +
+        '</td></tr>';
+    }
+    html += '</table></div>';
+
+    // Pipeline
+    html += renderPipeline();
+
+    html += '<div id="saveMsg" class="msg"></div>' +
+      '<div class="btn-row">' +
+        backBtn() +
+        '<div class="btn-row-right">' +
+          '<button class="btn btn-success" onclick="window._wizSave()">Save Configuration</button>' +
+        '</div>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizSave = async function() {
+    hideMsg("saveMsg");
+    showMsg("saveMsg", "info", "Saving configuration...");
+    try {
+      var c = state.config;
+      var env = {
+        BOARD_ADAPTER: c.adapter,
+        BOARD_DOMAIN: c.domain,
+        BOARD_API_TOKEN: c.apiToken,
+        BOARD_PROJECT_KEY: c.projectKey,
+        BOARD_EMAIL: c.email,
+        TARGET_REPO: c.targetRepo || "",
+        GIT_BASE_BRANCH: c.baseBranch,
+        POLL_INTERVAL: String((c.pollInterval || 60) * 60),
+        RUNNERS_ENABLED: (c.runners || []).join(",")
+      };
+
+      // Global Claude agent
+      env["CLAUDE_AGENT"] = c.claudeAgent || "";
+
+      // Dependency detection
+
+      // Add per-runner routing, max cards, and agent
+      var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+      for (var i = 0; i < runnerIds.length; i++) {
+        var rid = runnerIds[i];
+        var upper = rid.toUpperCase();
+        var route = c.routing[rid] || {};
+        env["RUNNER_" + upper + "_FROM"] = route.fromId || "";
+        env["RUNNER_" + upper + "_TO"] = route.toId || "";
+        if (rid === "review" && route.toRejectedId) {
+          env["RUNNER_REVIEW_TO_REJECTED"] = route.toRejectedId;
+        }
+        env["MAX_CARDS_" + upper] = String(route.maxCards || 5);
+        env["RUNNER_" + upper + "_AGENT"] = route.agent || "";
+      }
+
+      // Build adapter config (sanitize IDs for bash-safe variable names)
+      var adapterConfig = {};
+      for (var s = 0; s < state.discoveredStatuses.length; s++) {
+        var status = state.discoveredStatuses[s];
+        var safeId = status.id.replace(/[^a-zA-Z0-9_]/g, '_');
+        adapterConfig["STATUS_" + safeId] = status.name;
+      }
+      for (var t = 0; t < state.discoveredTransitions.length; t++) {
+        var trans = state.discoveredTransitions[t];
+        if (trans.toId && trans.id) {
+          var safeTo = trans.toId.replace(/[^a-zA-Z0-9_]/g, '_');
+          adapterConfig["TRANSITION_TO_" + safeTo] = trans.id;
+        }
+      }
+
+      var result = await apiPost("/api/save-config", {
+        adapter: c.adapter,
+        env: env,
+        adapterConfig: adapterConfig
+      });
+      if (!result.success) {
+        showMsg("saveMsg", "error", result.message || "Failed to save.");
+        return;
+      }
+      showMsg("saveMsg", "success", "Configuration saved successfully.");
+      setTimeout(goNext, 1000);
+    } catch(e) {
+      showMsg("saveMsg", "error", "Failed to save: " + e.message);
+    }
+  };
+
+  // ---- Step 7: Runner Dashboard ----
+
+  function _timeAgo(isoStr) {
+    if (!isoStr) return "";
+    var then = new Date(isoStr).getTime();
+    var now = Date.now();
+    var diff = Math.floor((now - then) / 1000);
+    if (diff < 0) return "just now";
+    if (diff < 60) return diff + "s ago";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+
+  function renderRunning() {
+    var r = state.runner;
+    var dotCls = r.running ? "dot-green" : "dot-red";
+    var statusLabel = r.running ? "Runner is active" : "Runner is stopped";
+    var pidText = r.pid ? "PID: " + r.pid : "No process running";
+
+    var html = '<h2>Runner</h2>' +
+      '<p>Control the Sorta.Fit automation runner.</p>';
+
+    // Status bar
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:16px">' +
+        '<span class="dot ' + dotCls + (r.running ? ' dot-pulse' : '') + '"></span>' +
+        '<div>' +
+          '<div style="font-weight:600">' + escHtml(statusLabel) + '</div>' +
+          '<div style="font-size:13px;color:var(--text-muted)">' + escHtml(pidText) + '</div>' +
+        '</div>' +
+      '</div>';
+
+    // Controls
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+    if (!r.running) {
+      html += '<button class="btn btn-success" onclick="window._wizStartRunner(false)">Start Runner</button>' +
+        '<button class="btn btn-secondary" onclick="window._wizStartRunner(true)" title="Run without a visible window">Start in Background</button>';
+    } else {
+      html += '<button class="btn btn-danger" onclick="window._wizStopRunner()">Stop Runner</button>';
+    }
+    html += '<button class="btn btn-secondary" onclick="window._wizCheckStatus()">Refresh</button>' +
+      '<button class="btn btn-secondary" onclick="window._wizViewLogs()">View Logs</button>' +
+      '</div>' +
+      '<div id="runnerMsg" class="msg"></div>';
+
+    // Claude permissions check
+    html += '<div style="margin-top:24px">' +
+      '<h3 style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:12px">Claude Code Permissions</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">' +
+        'The code runner needs a <code style="background:var(--bg);padding:2px 6px;border-radius:3px">.claude/settings.local.json</code> file ' +
+        'so Claude Code has permission to write files, run commands, and use git in worktrees. Without it, Claude will read specs but can\'t create code.</p>' +
+      '<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:monospace;font-size:12px;margin-bottom:8px;white-space:pre-wrap">' +
+        '{\n  "permissions": {\n    "allow": [\n      "Bash(*)", "Read(*)", "Write(*)",\n      "Edit(*)", "Glob(*)", "Grep(*)"\n    ]\n  }\n}' +
+      '</div>' +
+      '<p style="font-size:12px;color:var(--text-muted)">Save this as <code style="background:var(--bg);padding:2px 6px;border-radius:3px">.claude/settings.local.json</code> in your project root. This file is gitignored — each developer needs their own copy.</p>' +
+      '</div>';
+
+    // Run without wizard
+    html += '<div style="margin-top:24px">' +
+      '<h3 style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:12px">Run Without the Wizard</h3>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">' +
+        'Start the runner directly without the setup wizard:</p>' +
+      '<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:monospace;font-size:13px;margin-bottom:16px">' +
+        '<div><strong>Windows:</strong> run.bat</div>' +
+        '<div><strong>macOS / Linux:</strong> bash run.sh</div>' +
+      '</div>' +
+      '</div>';
+
+    // Scheduling instructions
+    html += '<div style="margin-top:16px">' +
+      '<h3 style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:12px">Schedule Automatic Runs</h3>' +
+      '<details style="margin-bottom:12px">' +
+        '<summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--text)">Windows (Task Scheduler)</summary>' +
+        '<div style="padding:12px;font-size:13px;color:var(--text-muted)">' +
+          '<ol style="padding-left:20px;line-height:2">' +
+            '<li>Open Task Scheduler (<code style="background:var(--bg);padding:2px 6px;border-radius:3px">taskschd.msc</code>)</li>' +
+            '<li>Click "Create Basic Task"</li>' +
+            '<li>Set trigger: "When the computer starts" or a schedule</li>' +
+            '<li>Set action: Start a program</li>' +
+            '<li>Program: <code style="background:var(--bg);padding:2px 6px;border-radius:3px">cmd</code></li>' +
+            '<li>Arguments: <code style="background:var(--bg);padding:2px 6px;border-radius:3px">/c "cd /d YOUR_PROJECT_PATH &amp;&amp; run.bat"</code></li>' +
+          '</ol>' +
+        '</div>' +
+      '</details>' +
+      '<details style="margin-bottom:12px">' +
+        '<summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--text)">macOS (launchd)</summary>' +
+        '<div style="padding:12px;font-size:13px;color:var(--text-muted)">' +
+          '<p>Create <code style="background:var(--bg);padding:2px 6px;border-radius:3px">~/Library/LaunchAgents/fit.sorta.runner.plist</code></p>' +
+          '<p style="margin-top:8px">Set <code>ProgramArguments</code> to <code>["bash", "YOUR_PROJECT_PATH/run.sh"]</code> with <code>RunAtLoad</code> = true.</p>' +
+          '<p style="margin-top:8px">Load it: <code style="background:var(--bg);padding:2px 6px;border-radius:3px">launchctl load ~/Library/LaunchAgents/fit.sorta.runner.plist</code></p>' +
+        '</div>' +
+      '</details>' +
+      '<details style="margin-bottom:12px">' +
+        '<summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--text)">Linux (cron)</summary>' +
+        '<div style="padding:12px;font-size:13px;color:var(--text-muted)">' +
+          '<p>Run <code style="background:var(--bg);padding:2px 6px;border-radius:3px">crontab -e</code> and add:</p>' +
+          '<pre style="background:var(--bg);padding:8px;border-radius:4px;margin:8px 0;border:1px solid var(--border)">@reboot cd YOUR_PROJECT_PATH &amp;&amp; bash run.sh</pre>' +
+        '</div>' +
+      '</details>' +
+      '</div>';
+
+    html += '<div class="btn-row">' +
+      backBtn() +
+      '<span></span>' +
+      '</div>';
+    return html;
+  }
+
+  window._wizStartRunner = async function(background) {
+    hideMsg("runnerMsg");
+    showMsg("runnerMsg", "info", "Starting runner...");
+    try {
+      var data = await apiPost("/api/start-runner", { background: !!background });
+      state.runner.running = true;
+      state.runner.pid = data.pid || null;
+      renderCard();
+      showMsg("runnerMsg", "success", "Runner started successfully.");
+      startStatusPolling();
+    } catch(e) {
+      showMsg("runnerMsg", "error", "Failed to start runner: " + e.message);
+    }
+  };
+
+  window._wizStopRunner = async function() {
+    hideMsg("runnerMsg");
+    showMsg("runnerMsg", "info", "Stopping runner...");
+    try {
+      await apiPost("/api/stop-runner");
+      state.runner.running = false;
+      state.runner.pid = null;
+      stopStatusPolling();
+      renderCard();
+      showMsg("runnerMsg", "success", "Runner stopped.");
+    } catch(e) {
+      showMsg("runnerMsg", "error", "Failed to stop runner: " + e.message);
+    }
+  };
+
+  window._wizCheckStatus = async function() {
+    try {
+      state.runner.running = !!data.running;
+      state.runner.pid = data.pid || null;
+      // status loaded
+      renderCard();
+    } catch(e) {
+      showMsg("runnerMsg", "error", "Failed to fetch status: " + e.message);
+    }
+  };
+
+  window._wizViewLogs = function() {
+    document.getElementById("logOverlay").classList.add("visible");
+    window._wizRefreshLogs();
+  };
+
+  window._wizCloseLogs = function() {
+    document.getElementById("logOverlay").classList.remove("visible");
+  };
+
+  window._wizRefreshLogs = async function() {
+    var container = document.getElementById("logContent");
+    container.innerHTML = '<div class="log-empty">Loading...</div>';
+    try {
+      var data = await apiPost("/api/logs");
+      if (data.empty || !data.logs) {
+        container.innerHTML = '<div class="log-empty">No logs yet. Start the runner to generate logs.</div>';
+      } else {
+        var pre = document.createElement("pre");
+        pre.textContent = data.logs;
+        container.innerHTML = "";
+        container.appendChild(pre);
+        container.scrollTop = container.scrollHeight;
+      }
+    } catch(e) {
+      container.innerHTML = '<div class="log-empty">Failed to load logs: ' + escHtml(e.message) + '</div>';
+    }
+  };
+
+  document.getElementById("logOverlay").addEventListener("click", function(e) {
+    if (e.target === this) {
+      window._wizCloseLogs();
+    }
+  });
+
+  function startStatusPolling() {
+    stopStatusPolling();
+    state.runner.pollTimer = setInterval(async function() {
+      try {
+        state.runner.running = !!data.running;
+        state.runner.pid = data.pid || null;
+        // status loaded
+        if (state.currentStep === 7) {
+          renderCard();
+        }
+        if (!state.runner.running) {
+          stopStatusPolling();
+        }
+      } catch(e) { /* silent */ }
+    }, 5000);
+  }
+
+  function stopStatusPolling() {
+    if (state.runner.pollTimer) {
+      clearInterval(state.runner.pollTimer);
+      state.runner.pollTimer = null;
+    }
+  }
+
+  // ---- Render ----
+
+  var stepRenderers = [
+    renderWelcome,
+    renderDeps,
+    renderBoard,
+    renderSelectRunners,
+    renderConfigureRunners,
+    renderGit,
+    renderReview,
+    renderRunning
+  ];
+
+  function renderCard() {
+    document.getElementById("wizardCard").innerHTML = stepRenderers[state.currentStep]();
+  }
+
+  function render() {
+    renderStepIndicator();
+    renderCard();
+
+    if (state.currentStep === 1 && !state.deps) {
+      window._wizCheckDeps();
+    }
+
+    if (state.currentStep === 7 && state.runner.running) {
+      startStatusPolling();
+    } else if (state.currentStep !== 7) {
+      stopStatusPolling();
+    }
+
+    if (state.currentStep === 7) {
+      window._wizCheckStatus();
+    }
+  }
+
+  // ---- Init ----
+
+  if (window.location.protocol === "file:") {
+    document.getElementById("wizardCard").innerHTML =
+      '<h2>Server Not Running</h2>' +
+      '<p>This page was opened directly from the file system. The setup wizard needs its server running.</p>' +
+      '<p style="margin-top:16px"><strong>To start the server:</strong></p>' +
+      '<p><strong>Windows:</strong> Double-click <code style="background:var(--bg);padding:2px 6px;border-radius:3px">setup.bat</code></p>' +
+      '<p><strong>macOS / Linux:</strong> Run <code style="background:var(--bg);padding:2px 6px;border-radius:3px">bash setup.sh</code></p>' +
+      '<p style="margin-top:16px;color:var(--text-muted)">The server will open this wizard automatically at <code style="background:var(--bg);padding:2px 6px;border-radius:3px">http://localhost:3456</code></p>';
+    return;
+  }
+
+  // Load existing config before rendering
+  (async function() {
+    try {
+      var data = await apiPost("/api/load-config");
+      if (data.success && data.env) {
+        var env = data.env;
+        state.config.adapter = env.BOARD_ADAPTER || "jira";
+        state.config.domain = env.BOARD_DOMAIN || "";
+        state.config.email = env.BOARD_EMAIL || "";
+        state.config.apiToken = env.BOARD_API_TOKEN || "";
+        state.config.projectKey = env.BOARD_PROJECT_KEY || "";
+        state.config.targetRepo = env.TARGET_REPO || "";
+        state.config.baseBranch = env.GIT_BASE_BRANCH || "main";
+        state.config.pollInterval = env.POLL_INTERVAL ? Math.round(parseInt(env.POLL_INTERVAL) / 60) : 60;
+
+        if (env.RUNNERS_ENABLED) {
+          state.config.runners = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
+        }
+
+        state.config.claudeAgent = env.CLAUDE_AGENT || "";
+
+        // Dependency detection
+
+        var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+        for (var i = 0; i < runnerIds.length; i++) {
+          var rid = runnerIds[i];
+          var upper = rid.toUpperCase();
+          var fromKey = "RUNNER_" + upper + "_FROM";
+          var toKey = "RUNNER_" + upper + "_TO";
+          var maxKey = "MAX_CARDS_" + upper;
+          var agentKey = "RUNNER_" + upper + "_AGENT";
+          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5, agent: "" };
+          if (env[fromKey]) state.config.routing[rid].fromId = env[fromKey];
+          if (env[toKey]) state.config.routing[rid].toId = env[toKey];
+          if (rid === "review" && env["RUNNER_REVIEW_TO_REJECTED"]) {
+            state.config.routing[rid].toRejectedId = env["RUNNER_REVIEW_TO_REJECTED"];
+          }
+          if (env[maxKey]) state.config.routing[rid].maxCards = parseInt(env[maxKey]) || state.config.routing[rid].maxCards;
+          if (env[agentKey]) state.config.routing[rid].agent = env[agentKey];
+        }
+
+        if (data.statuses && data.statuses.length > 0) {
+          state.discoveredStatuses = data.statuses;
+          state.boardDiscovered = true;
+          state.connectionTested = true;
+        }
+        if (data.transitions && data.transitions.length > 0) {
+          state.discoveredTransitions = data.transitions.map(function(t) {
+            return { id: t.transitionId, name: "", toName: "", toId: t.statusId };
+          });
+        }
+      }
+    } catch(e) {
+      // No existing config -- proceed with defaults
+    }
+
+    // Allow jumping to a step via URL parameter: ?step=7
+    var params = new URLSearchParams(window.location.search);
+    var stepParam = parseInt(params.get("step"));
+    if (stepParam >= 0 && stepParam < STEPS.length) {
+      state.currentStep = stepParam;
+    }
+
+    render();
+  })();
+
+})();
+</script>
+</body>
+</html>

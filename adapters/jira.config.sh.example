@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Jira adapter configuration — status and transition IDs
+# Run the setup wizard or use board_discover to find these values
+# Copy this to jira.config.sh and fill in your project's IDs
+
+# Status ID → display name (from your Jira workflow)
+STATUS_10000="To Do"
+STATUS_10070="Refined"
+STATUS_10069="Agent"
+STATUS_10001="In Progress"
+STATUS_10036="QA"
+STATUS_10002="Done"
+STATUS_10003="Backlog"
+
+# How to transition a card TO each status (transition IDs from Jira)
+TRANSITION_TO_10000=11
+TRANSITION_TO_10070=5
+TRANSITION_TO_10069=4
+TRANSITION_TO_10001=21
+TRANSITION_TO_10036=3
+TRANSITION_TO_10003=2
+TRANSITION_TO_10002=31

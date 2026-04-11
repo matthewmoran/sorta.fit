@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Linear adapter configuration — workflow state IDs
+# Run the setup wizard or use board_discover to find these values
+# Copy this to linear.config.sh and fill in your team's workflow state UUIDs
+#
+# In Linear, status IDs are UUIDs (e.g., "f2b1c3d4-5678-9abc-def0-1234567890ab")
+# Transition IDs are the same as target state IDs (Linear allows direct state changes)
+#
+# IMPORTANT: Bash variable names cannot contain hyphens.
+# Config keys use underscores in place of hyphens (e.g., UUID f2b1c3d4-... becomes f2b1c3d4_...).
+# Config values use the real UUID with hyphens (for API calls).
+# The board_discover command outputs both forms for easy copy-paste.
+
+# Status UUID (sanitized) → display name (from your Linear workflow)
+# STATUS_f2b1c3d4_5678_9abc_def0_1234567890ab="Backlog"
+# STATUS_a1b2c3d4_5678_9abc_def0_1234567890ab="Todo"
+# STATUS_b2c3d4e5_5678_9abc_def0_1234567890ab="In Progress"
+# STATUS_c3d4e5f6_5678_9abc_def0_1234567890ab="In Review"
+# STATUS_d4e5f6a7_5678_9abc_def0_1234567890ab="Done"
+
+# How to transition a card TO each status
+# Key: sanitized UUID (hyphens replaced with underscores)
+# Value: real UUID with hyphens (used in Linear API calls)
+# TRANSITION_TO_f2b1c3d4_5678_9abc_def0_1234567890ab=f2b1c3d4-5678-9abc-def0-1234567890ab
+# TRANSITION_TO_a1b2c3d4_5678_9abc_def0_1234567890ab=a1b2c3d4-5678-9abc-def0-1234567890ab
+# TRANSITION_TO_b2c3d4e5_5678_9abc_def0_1234567890ab=b2c3d4e5-5678-9abc-def0-1234567890ab
+# TRANSITION_TO_c3d4e5f6_5678_9abc_def0_1234567890ab=c3d4e5f6-5678-9abc-def0-1234567890ab
+# TRANSITION_TO_d4e5f6a7_5678_9abc_def0_1234567890ab=d4e5f6a7-5678-9abc-def0-1234567890ab

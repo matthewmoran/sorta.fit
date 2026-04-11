@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sortafit"
+version = "0.1.0"
+description = "AI-powered sprint automation — connects issue boards to Claude Code CLI"
+requires-python = ">=3.10"
+license = "AGPL-3.0-only"
+dependencies = [
+    "requests>=2.31",
+    "cryptography>=41.0",
+    "PyJWT>=2.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+    "responses>=0.23",
+]
+
+[project.scripts]
+sortafit = "sortafit.__main__:main"
+sortafit-setup = "sortafit.setup.server:main"
+
+[tool.setuptools.packages.find]
+include = ["sortafit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
