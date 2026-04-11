@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Runner: Review — reviews PR diffs and posts feedback
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SORTA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+source "$SORTA_ROOT/core/config.sh"
+source "$SORTA_ROOT/core/utils.sh"
+source "$SORTA_ROOT/adapters/${BOARD_ADAPTER}.sh"
+source "$SORTA_ROOT/core/runner-lib.sh"
+
+log_info "Reviewer: checking $RUNNER_REVIEW_FROM lane..."
+
+GH_CMD=$(find_gh)
+
+START_AT=0
+SKIP_RETRIES=0
+
+while true; do
+ISSUE_IDS=$(board_get_cards_in_status "$RUNNER_REVIEW_FROM" "$MAX_CARDS_REVIEW" "$START_AT")
+
+if [[ -z "$ISSUE_IDS" ]]; then
+  [[ "$START_AT" -eq 0 ]] && log_info "No cards in $RUNNER_REVIEW_FROM. Nothing to review."
+  break
+fi
+
+BATCH_PROCESSED=0
+
+for ISSUE_ID in $ISSUE_IDS; do
+  ISSUE_KEY=$(board_get_card_key "$ISSUE_ID") || { log_warn "Failed to fetch key for issue $ISSUE_ID. Skipping."; continue; }
+  COMMENTS=$(board_get_card_comments "$ISSUE_KEY") || { log_warn "Failed to fetch comments for $ISSUE_KEY. Skipping."; continue; }
+
+  # Find most recent PR URL in comments
+  PR_URL=$(extract_pr_url "$COMMENTS")
+
+  if [[ -z "$PR_URL" ]]; then
+    log_info "No PR URL found for $ISSUE_KEY. Skipping."
+    continue
+  fi
+
+  # Check if already reviewed by Sorta.Fit (allow re-review after rework)
+  # Assumes comments are returned in chronological order (line N < line M ⟹ N is older)
+  if echo "$COMMENTS" | grep -q "Code Review —"; then
+    last_review_line=$(echo "$COMMENTS" | grep -n "Code Review —" | tail -1 | cut -d: -f1)
+    last_rework_line=$(echo "$COMMENTS" | grep -n "Rework pushed by Sorta.Fit" | tail -1 | cut -d: -f1)
+    if [[ -z "$last_rework_line" ]] || [[ "$last_review_line" -gt "$last_rework_line" ]]; then
+      log_info "$ISSUE_KEY already reviewed. Skipping."
+      continue
+    fi
+    log_info "$ISSUE_KEY has rework after last review. Re-reviewing."
+  fi
+
+  log_step "Reviewing: $ISSUE_KEY — $PR_URL"
+
+  # Get PR diff
+  PR_DIFF=$("$GH_CMD" pr diff "$PR_URL" 2>&1) || {
+    log_error "Failed to get diff for $PR_URL"
+    continue
+  }
+
+  if [[ -z "$PR_DIFF" ]]; then
+    log_warn "Empty diff for $PR_URL. Skipping."
+    continue
+  fi
+
+  # Truncate large diffs
+  MAX_CHARS=100000
+  if [[ ${#PR_DIFF} -gt $MAX_CHARS ]]; then
+    log_warn "Diff too large (${#PR_DIFF} chars). Truncating."
+    PR_DIFF="${PR_DIFF:0:$MAX_CHARS}
+
+... [diff truncated] ..."
+  fi
+
+  # Build prompt
+  PROMPT=$(render_template "$SORTA_ROOT/prompts/review.md" \
+    CARD_KEY "$ISSUE_KEY" \
+    PR_URL "$PR_URL" \
+    PR_DIFF "$PR_DIFF")
+
+  PROMPT_FILE=$(mktemp)
+  RESULT_FILE=$(mktemp)
+  printf '%s' "$PROMPT" > "$PROMPT_FILE"
+
+  log_info "Running Claude for review..."
+  claude_rc=0
+  run_claude_safe "$PROMPT_FILE" "$RESULT_FILE" "" "${RUNNER_REVIEW_AGENT:-$CLAUDE_AGENT}" || claude_rc=$?
+  if [[ "$claude_rc" -eq 2 ]]; then break; fi
+  if [[ "$claude_rc" -ne 0 ]]; then
+    log_error "Claude failed for review of $ISSUE_KEY"
+    continue
+  fi
+
+  REVIEW=$(cat "$RESULT_FILE")
+  rm -f "$PROMPT_FILE" "$RESULT_FILE"
+
+  if [[ -z "$REVIEW" ]]; then
+    log_warn "Empty review for $ISSUE_KEY. Skipping."
+    continue
+  fi
+
+  # Parse verdict line from Claude's output
+  REVIEW_EVENT="comment"
+  VERDICT_LINE=$(echo "$REVIEW" | grep -oE '^VERDICT: (APPROVE|REQUEST_CHANGES)' | tail -1)
+  if [[ "$VERDICT_LINE" == "VERDICT: APPROVE" ]]; then
+    REVIEW_EVENT="approve"
+  elif [[ "$VERDICT_LINE" == "VERDICT: REQUEST_CHANGES" ]]; then
+    REVIEW_EVENT="request-changes"
+  fi
+
+  # Strip the verdict line from the review body before posting
+  REVIEW=$(echo "$REVIEW" | sed '/^VERDICT: /d')
+
+  # Post to GitHub
+  log_info "Posting review ($REVIEW_EVENT) to $PR_URL..."
+  REVIEW_BODY_FILE=$(mktemp)
+  printf '%s' "$REVIEW" > "$REVIEW_BODY_FILE"
+
+  "$GH_CMD" pr review "$PR_URL" --"$REVIEW_EVENT" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || {
+    log_info "Posting as comment (can't review your own PR)."
+    "$GH_CMD" pr comment "$PR_URL" --body-file "$REVIEW_BODY_FILE" 2>/dev/null || \
+      log_error "Could not post review to $PR_URL"
+  }
+  rm -f "$REVIEW_BODY_FILE"
+
+  # Post full review to card so board watchers see everything
+  VERDICT_LABEL="Comment"
+  if [[ "$REVIEW_EVENT" == "approve" ]]; then
+    VERDICT_LABEL="Approved"
+  elif [[ "$REVIEW_EVENT" == "request-changes" ]]; then
+    VERDICT_LABEL="Changes Requested"
+  fi
+
+  board_add_comment "$ISSUE_KEY" "Code Review — $VERDICT_LABEL ($PR_URL)
+
+$REVIEW"
+
+  runner_transition "$ISSUE_KEY" "$RUNNER_REVIEW_TO" "reviewed"
+  BATCH_PROCESSED=$((BATCH_PROCESSED + 1))
+done
+
+[[ "$BATCH_PROCESSED" -gt 0 ]] && break
+SKIP_RETRIES=$((SKIP_RETRIES + 1))
+if [[ "$SKIP_RETRIES" -ge "$MAX_SKIP_RETRIES" ]]; then
+  log_info "Reached max skip retries ($MAX_SKIP_RETRIES). Moving on."
+  break
+fi
+START_AT=$((START_AT + MAX_CARDS_REVIEW))
+log_info "All cards skipped in batch. Fetching next batch (retry $SKIP_RETRIES/$MAX_SKIP_RETRIES)..."
+done

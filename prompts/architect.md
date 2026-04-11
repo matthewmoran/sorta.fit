@@ -32,7 +32,7 @@ Your task:
 - [Anything to avoid or watch out for]
 
 ## Open Questions
-- [Anything the spec leaves ambiguous that the implementer should decide]
+- [Anything genuinely ambiguous that would block implementation]
 
-If you have NO items for 'Open Questions', omit that section entirely.
+IMPORTANT: Only include "Open Questions" if there is a real ambiguity that cannot be resolved from the code, spec, or existing patterns. Do NOT include confirmation-style questions ("Should we use X?", "Confirm this approach") — make a decision based on the codebase conventions and state it in the plan. If everything is clear, omit this section entirely. Most cards should NOT need this section.
 IMPORTANT: Output ONLY the architecture plan. No preamble, no explanation, just the plan.

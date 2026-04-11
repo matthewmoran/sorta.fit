@@ -31,8 +31,7 @@ Your task:
 - [ ] [Edge cases to cover]
 
 ## Needs Clarification
-- [List anything you cannot determine from the code alone]
-- [Questions for the product owner]
+- [List anything you genuinely cannot determine from the code or card alone]
 
-If you have NO items for 'Needs Clarification', omit that section entirely.
+IMPORTANT: Only include "Needs Clarification" if there is a real ambiguity that would block implementation. Do NOT include confirmation-style questions ("Confirm this approach", "Verify this is correct") — those are not clarifications. If everything is clear from the code and spec, omit this section entirely. Most cards should NOT need this section.
 IMPORTANT: Output ONLY the refined spec text. No preamble, no explanation, just the spec.

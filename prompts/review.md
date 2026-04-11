@@ -1,4 +1,4 @@
-You are reviewing a pull request.
+You are reviewing a pull request. Review ONLY the diff provided below — do not check out branches, run tests, or explore the repository. If you need context about a file, use the Read tool to read it directly.
 
 CARD KEY: {{CARD_KEY}}
 PR URL: {{PR_URL}}
@@ -16,16 +16,19 @@ Review this PR for:
 
 For each issue found, specify:
 - **File and line** — where the issue is
-- **Severity** — Critical (must fix), Warning (should fix), Suggestion (nice to have)
+- **Severity** — Critical (must fix), Warning (must fix), Suggestion (nice to have)
 - **What** — what the problem is
 - **Fix** — how to fix it
 
 If the PR looks good overall, say so. Be constructive, not nitpicky. Focus on real issues, not style preferences.
 
+**Important:** Do not run git commands, check out branches, or run tests. Your only job is to review the diff above and provide feedback.
+
 After your review, output a verdict line on its own line at the very end:
 
-- If there are Critical issues that must be fixed: `VERDICT: REQUEST_CHANGES`
-- If the PR looks good with no critical issues: `VERDICT: APPROVE`
-- If you only have suggestions but nothing blocking: `VERDICT: APPROVE`
+- If there are ANY Critical or Warning issues: `VERDICT: REQUEST_CHANGES`
+- If the PR has only Suggestions or no issues at all: `VERDICT: APPROVE`
+
+Warnings are blocking. Only Suggestions are non-blocking.
 
 Output your review as a structured comment suitable for a GitHub PR review, followed by the verdict line.

@@ -6,35 +6,23 @@ echo "  Sorta.Fit Setup"
 echo "================================================"
 echo ""
 
-# Check Node.js
-if ! command -v node &>/dev/null; then
-  echo "ERROR: Node.js is not installed."
-  echo "Download from https://nodejs.org"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+PYTHON_CMD="python3"
+if ! command -v python3 &>/dev/null; then
+  PYTHON_CMD="python"
+fi
+
+if ! command -v "$PYTHON_CMD" &>/dev/null; then
+  echo "ERROR: Python 3 is not installed."
+  echo "Download from https://python.org"
   exit 1
 fi
 
-# Check Git
-if ! command -v git &>/dev/null; then
-  echo "ERROR: Git is not installed."
-  echo "Download from https://git-scm.com/downloads"
-  exit 1
-fi
-
-echo "Dependencies found."
-echo ""
-
-# Install npm dependencies if needed
-if [[ -f "package.json" ]] && [[ ! -d "node_modules" ]]; then
-  echo "Installing dependencies..."
-  npm install
-  echo ""
-fi
-
-# Launch setup server
 echo "Starting setup wizard..."
 echo "Opening http://localhost:3456 in your browser..."
 echo ""
 echo "Press Ctrl+C to stop."
 echo ""
 
-node setup/server.js
+exec "$PYTHON_CMD" "$SCRIPT_DIR/setup_wizard.py"

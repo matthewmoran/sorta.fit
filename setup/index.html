@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="session-token" content="{{SESSION_TOKEN}}">
 <title>Sorta.Fit - Setup Wizard</title>
 <style>
 *, *::before, *::after {
@@ -395,17 +396,17 @@ select option:disabled {
   flex-shrink: 0;
 }
 
-.checkbox-item .recipe-info {
+.checkbox-item .runner-info {
   flex: 1;
 }
 
-.checkbox-item .recipe-name {
+.checkbox-item .runner-name {
   font-weight: 600;
   font-size: 14px;
   display: block;
 }
 
-.checkbox-item .recipe-desc {
+.checkbox-item .runner-desc {
   font-size: 12px;
   color: var(--text-muted);
   display: block;
@@ -487,32 +488,99 @@ select option:disabled {
 }
 
 /* Dashboard */
-.dashboard-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px;
+
+
+
+
+/* Dashboard grid */
+
+
+
+
+
+.rate-limited-banner {
+  border: 1px solid var(--warning);
+  background: rgba(210, 153, 34, 0.1);
+  color: var(--warning);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.dot-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.runner-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.runner-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.runner-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cycle-summary {
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
-  margin: 16px 0;
+  padding: 16px;
+  margin: 12px 0;
 }
 
-.dashboard-status .status-text {
-  font-weight: 600;
-  font-size: 16px;
-}
-
-.dashboard-detail {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.dashboard-controls {
+.cycle-summary-header {
   display: flex;
-  gap: 12px;
-  margin: 16px 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cycle-runner-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.events-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.events-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
 }
 
 /* Spinner */
@@ -714,22 +782,23 @@ select option:disabled {
       targetRepo: "",
       baseBranch: "main",
       pollInterval: 60,
-      recipes: ["refine", "code"],
+      claudeAgent: "",
+      runners: ["refine", "code"],
       routing: {
-        refine:    { fromId: "", toId: "", maxCards: 5 },
-        architect: { fromId: "", toId: "", maxCards: 5 },
-        code:      { fromId: "", toId: "", maxCards: 2 },
-        review:  { fromId: "", toId: "", maxCards: 10 },
-        triage:  { fromId: "", toId: "", maxCards: 5 },
-        bounce:  { fromId: "", toId: "", maxCards: 10 },
-        merge:   { fromId: "", toId: "", maxCards: 10 },
-        documenter: { fromId: "", toId: "", maxCards: 5 }
+        refine:    { fromId: "", toId: "", maxCards: 5, agent: "" },
+        architect: { fromId: "", toId: "", maxCards: 5, agent: "" },
+        code:      { fromId: "", toId: "", maxCards: 2, agent: "" },
+        review:  { fromId: "", toId: "", toRejectedId: "", maxCards: 10, agent: "" },
+        triage:  { fromId: "", toId: "", maxCards: 5, agent: "" },
+        bounce:  { fromId: "", toId: "", maxCards: 10, agent: "" },
+        merge:   { fromId: "", toId: "", maxCards: 10, agent: "" },
+        documenter: { fromId: "", toId: "", maxCards: 5, agent: "" }
       }
     },
     runner: {
       running: false,
       pid: null,
-      pollTimer: null
+      pollTimer: null,
     }
   };
 
@@ -760,9 +829,10 @@ select option:disabled {
   }
 
   async function apiPost(url, data) {
+    var token = document.querySelector('meta[name="session-token"]').content;
     var resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
       body: JSON.stringify(data || {})
     });
     if (!resp.ok) {
@@ -939,26 +1009,40 @@ select option:disabled {
         '<label for="adapter">Adapter</label>' +
         '<select id="adapter" onchange="window._wizBoardField(\'adapter\', this.value)">' +
           '<option value="jira"' + (c.adapter === "jira" ? " selected" : "") + '>Jira</option>' +
-          '<option value="linear" disabled>Linear (coming soon)</option>' +
-          '<option value="github-issues" disabled>GitHub Issues (coming soon)</option>' +
+          '<option value="linear"' + (c.adapter === "linear" ? " selected" : "") + '>Linear</option>' +
+          '<option value="github-issues"' + (c.adapter === "github-issues" ? " selected" : "") + '>GitHub Issues</option>' +
         '</select>' +
       '</div>' +
-      '<div class="form-group">' +
-        '<label for="domain">Board Domain</label>' +
-        '<span class="hint">e.g. yourteam.atlassian.net</span>' +
-        '<input type="text" id="domain" value="' + escHtml(c.domain) + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
-      '</div>' +
-      '<div class="form-group">' +
-        '<label for="email">Email</label>' +
-        '<input type="email" id="email" value="' + escHtml(c.email) + '" onchange="window._wizBoardField(\'email\', this.value)" />' +
-      '</div>' +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="domain">Board Domain</label>' +
+          '<span class="hint">e.g. yourteam.atlassian.net</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain) + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+      c.adapter === 'linear' ?
+        '<div class="form-group">' +
+          '<label for="domain">API Endpoint</label>' +
+          '<span class="hint">Default: api.linear.app</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'api.linear.app') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>' :
+        '<div class="form-group">' +
+          '<label for="domain">GitHub Domain</label>' +
+          '<span class="hint">Default: github.com</span>' +
+          '<input type="text" id="domain" value="' + escHtml(c.domain || 'github.com') + '" onchange="window._wizBoardField(\'domain\', this.value)" />' +
+        '</div>') +
+      (c.adapter === 'jira' ?
+        '<div class="form-group">' +
+          '<label for="email">Email</label>' +
+          '<input type="email" id="email" value="' + escHtml(c.email) + '" onchange="window._wizBoardField(\'email\', this.value)" />' +
+        '</div>' : '') +
       '<div class="form-group">' +
         '<label for="apiToken">API Token</label>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'Atlassian API token' : c.adapter === 'linear' ? 'Linear API key (Settings &rarr; API)' : 'GitHub personal access token') + '</span>' +
         '<input type="password" id="apiToken" value="' + escHtml(c.apiToken) + '" onchange="window._wizBoardField(\'apiToken\', this.value)" />' +
       '</div>' +
       '<div class="form-group">' +
         '<label for="projectKey">Project Key</label>' +
-        '<span class="hint">e.g. PROJ</span>' +
+        '<span class="hint">' + (c.adapter === 'jira' ? 'e.g. PROJ' : c.adapter === 'linear' ? 'Team key, e.g. ENG' : 'owner/repo, e.g. acme/my-project') + '</span>' +
         '<input type="text" id="projectKey" value="' + escHtml(c.projectKey) + '" onchange="window._wizBoardField(\'projectKey\', this.value)" />' +
       '</div>' +
       '<div style="display:flex;gap:12px">' +
@@ -1015,12 +1099,21 @@ select option:disabled {
     state.config[field] = val;
     state.connectionTested = false;
     state.boardDiscovered = false;
+    if (field === 'adapter') {
+      var defaults = { jira: '', linear: 'api.linear.app', 'github-issues': 'github.com' };
+      state.config.domain = defaults[val] || '';
+      if (val !== 'jira') state.config.email = '';
+      renderCard();
+    }
   };
 
   window._wizTestConn = async function() {
     var c = state.config;
     hideMsg("connMsg");
-    if (!c.domain || !c.email || !c.apiToken || !c.projectKey) {
+    var missingFields = !c.domain || !c.projectKey;
+    if (c.adapter !== 'github-issues') missingFields = missingFields || !c.apiToken;
+    if (c.adapter === 'jira') missingFields = missingFields || !c.email;
+    if (missingFields) {
       showMsg("connMsg", "error", "Please fill in all fields before testing the connection.");
       return;
     }
@@ -1076,8 +1169,8 @@ select option:disabled {
 
   // ---- Step 3: Select Runners ----
 
-  function renderSelectRecipes() {
-    var selected = state.config.recipes;
+  function renderSelectRunners() {
+    var selected = state.config.runners;
 
     var html = '<h2>Select Runners</h2>' +
       '<p>Choose which automation runners to enable. You\'ll configure their lanes and limits in the next step.</p>' +
@@ -1088,16 +1181,16 @@ select option:disabled {
       var checked = selected.indexOf(r.id) !== -1;
       html += '<div class="checkbox-item">' +
         '<input type="checkbox" value="' + r.id + '"' + (checked ? " checked" : "") +
-          ' onchange="window._wizToggleRecipe(\'' + r.id + '\', this.checked)" style="cursor:pointer" />' +
-        '<div class="recipe-info">' +
-          '<span class="recipe-name">' + escHtml(r.name) + '</span>' +
-          '<span class="recipe-desc">' + escHtml(r.desc) + '</span>' +
+          ' onchange="window._wizToggleRunner(\'' + r.id + '\', this.checked)" style="cursor:pointer" />' +
+        '<div class="runner-info">' +
+          '<span class="runner-name">' + escHtml(r.name) + '</span>' +
+          '<span class="runner-desc">' + escHtml(r.desc) + '</span>' +
         '</div>' +
       '</div>';
     }
 
     html += '</div>' +
-      '<div id="recipeSelectMsg" class="msg"></div>' +
+      '<div id="runnerSelectMsg" class="msg"></div>' +
       '<div class="btn-row">' +
         backBtn() +
         '<div class="btn-row-right">' +
@@ -1107,19 +1200,19 @@ select option:disabled {
     return html;
   }
 
-  window._wizToggleRecipe = function(id, checked) {
-    var idx = state.config.recipes.indexOf(id);
+  window._wizToggleRunner = function(id, checked) {
+    var idx = state.config.runners.indexOf(id);
     if (checked && idx === -1) {
-      state.config.recipes.push(id);
+      state.config.runners.push(id);
     } else if (!checked && idx !== -1) {
-      state.config.recipes.splice(idx, 1);
+      state.config.runners.splice(idx, 1);
     }
     renderCard();
   };
 
   window._wizNext3 = function() {
-    if (state.config.recipes.length === 0) {
-      showMsg("recipeSelectMsg", "error", "Please select at least one runner.");
+    if (state.config.runners.length === 0) {
+      showMsg("runnerSelectMsg", "error", "Please select at least one runner.");
       return;
     }
     goNext();
@@ -1159,23 +1252,23 @@ select option:disabled {
   }
 
   function renderPipeline() {
-    // Build the pipeline from the recipe routing, including human gates
-    var recipes = state.config.recipes;
+    // Build the pipeline from the runner routing, including human gates
+    var runners = state.config.runners;
     var routing = state.config.routing;
 
     // Define the main pipeline flow with human gates
     // Order: refine output -> human gate -> code input -> code output -> review -> human gate -> done
-    var steps = []; // { type: "status"|"human", id, label, recipe }
+    var steps = []; // { type: "status"|"human", id, label, runner }
 
-    // Build edges from active recipes
+    // Build edges from active runners
     var edges = [];
-    var recipeOrder = ["refine", "architect", "code", "review"];
-    for (var i = 0; i < recipeOrder.length; i++) {
-      var rid = recipeOrder[i];
-      if (recipes.indexOf(rid) === -1) continue;
+    var runnerOrder = ["refine", "architect", "code", "review", "merge", "documenter"];
+    for (var i = 0; i < runnerOrder.length; i++) {
+      var rid = runnerOrder[i];
+      if (runners.indexOf(rid) === -1) continue;
       var route = routing[rid];
       if (route.fromId) {
-        edges.push({ from: route.fromId, to: route.toId, recipe: rid });
+        edges.push({ from: route.fromId, to: route.toId, runner: rid });
       }
     }
 
@@ -1193,7 +1286,7 @@ select option:disabled {
         steps.push({ type: "status", id: edge.from });
       }
 
-      steps.push({ type: "arrow", recipe: edge.recipe });
+      steps.push({ type: "arrow", runner: edge.runner });
 
       var toId = edge.to || edge.from; // review stays in same lane
       if (!seen[toId]) {
@@ -1205,7 +1298,7 @@ select option:disabled {
       if (ei < edges.length - 1) {
         var nextFrom = edges[ei + 1].from;
         if (toId !== nextFrom && !seen[nextFrom]) {
-          steps.push({ type: "arrow", recipe: "human" });
+          steps.push({ type: "arrow", runner: "human" });
           seen[nextFrom] = true;
           steps.push({ type: "status", id: nextFrom });
         }
@@ -1215,7 +1308,7 @@ select option:disabled {
     // Add final human gate to Done if we have a "Done" status discovered
     var doneId = findStatusIdByRole("DONE");
     if (doneId && !seen[doneId]) {
-      steps.push({ type: "arrow", recipe: "human" });
+      steps.push({ type: "arrow", runner: "human" });
       steps.push({ type: "status", id: doneId });
     }
 
@@ -1225,9 +1318,9 @@ select option:disabled {
       if (step.type === "status") {
         html += '<div class="pipeline-node active">' + escHtml(statusName(step.id)) + '</div>';
       } else if (step.type === "arrow") {
-        var isHuman = step.recipe === "human";
+        var isHuman = step.runner === "human";
         var labelCls = isHuman ? "arrow-label human" : "arrow-label";
-        var label = isHuman ? "you" : step.recipe;
+        var label = isHuman ? "you" : step.runner;
         html += '<div class="pipeline-arrow">' +
           '<span class="' + labelCls + '">' + escHtml(label) + '</span>' +
           '<div class="arrow-line"></div>' +
@@ -1238,8 +1331,8 @@ select option:disabled {
     return html;
   }
 
-  function renderConfigureRecipes() {
-    var recipes = state.config.recipes;
+  function renderConfigureRunners() {
+    var runners = state.config.runners;
     var routing = state.config.routing;
 
     var html = '<h2>Configure Runners</h2>' +
@@ -1258,10 +1351,10 @@ select option:disabled {
     // Pipeline diagram
     html += renderPipeline();
 
-    // Per-recipe configuration
+    // Per-runner configuration
     for (var i = 0; i < RUNNER_DEFS.length; i++) {
       var r = RUNNER_DEFS[i];
-      if (recipes.indexOf(r.id) === -1) continue;
+      if (runners.indexOf(r.id) === -1) continue;
       var route = routing[r.id];
 
       html += '<div style="border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:12px;background:var(--bg)">' +
@@ -1270,17 +1363,29 @@ select option:disabled {
         '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:150px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Pickup lane</label>' +
-            statusDropdown(route.fromId, "window._wizRouteField('" + r.id + "','fromId',this.value)") +
+            statusDropdown(route.fromId, "window._wizRunnerRouteField('" + r.id + "','fromId',this.value)") +
           '</div>' +
           '<div style="flex:1;min-width:150px">' +
-            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Result lane</label>' +
-            statusDropdown(route.toId, "window._wizRouteField('" + r.id + "','toId',this.value)") +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">' +
+              (r.id === 'review' ? 'Approved lane' : 'Result lane') + '</label>' +
+            statusDropdown(route.toId, "window._wizRunnerRouteField('" + r.id + "','toId',this.value)") +
           '</div>' +
+          (r.id === 'review' ?
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Rejected lane</label>' +
+            statusDropdown(route.toRejectedId || '', "window._wizRunnerRouteField('" + r.id + "','toRejectedId',this.value)") +
+          '</div>' : '') +
           '<div style="width:120px">' +
             '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Max cards</label>' +
             '<input type="number" value="' + (route.maxCards || 5) + '" min="1" style="font-size:13px" ' +
-              'onchange="window._wizRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'maxCards\',parseInt(this.value)||5)" />' +
           '</div>' +
+          (r.id !== "bounce" && r.id !== "merge" ?
+          '<div style="flex:1;min-width:150px">' +
+            '<label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Claude Agent</label>' +
+            '<input type="text" value="' + escHtml(route.agent || '') + '" placeholder="(optional)" style="font-size:13px" ' +
+              'onchange="window._wizRunnerRouteField(\'' + r.id + '\',\'agent\',this.value)" />' +
+          '</div>' : '') +
         '</div>' +
       '</div>';
     }
@@ -1294,8 +1399,8 @@ select option:disabled {
     return html;
   }
 
-  window._wizRouteField = function(recipe, field, val) {
-    state.config.routing[recipe][field] = val;
+  window._wizRunnerRouteField = function(runner, field, val) {
+    state.config.routing[runner][field] = val;
     renderCard();
   };
 
@@ -1348,10 +1453,10 @@ select option:disabled {
   };
 
   window._wizNext4 = function() {
-    var recipes = state.config.recipes;
+    var runners = state.config.runners;
     var routing = state.config.routing;
-    for (var i = 0; i < recipes.length; i++) {
-      var rid = recipes[i];
+    for (var i = 0; i < runners.length; i++) {
+      var rid = runners[i];
       if (!routing[rid] || !routing[rid].fromId) {
         showMsg("configMsg", "error", "Please set a pickup lane for " + rid + ".");
         return;
@@ -1381,6 +1486,46 @@ select option:disabled {
         '<span class="hint">How often the runner checks for new cards</span>' +
         '<input type="number" id="pollInterval" value="' + c.pollInterval + '" min="1" onchange="window._wizGitField(\'pollInterval\', parseInt(this.value) || 60)" />' +
       '</div>' +
+      '<div class="form-group">' +
+        '<label for="claudeAgent">Default Claude Agent</label>' +
+        '<span class="hint">Pre-configured Claude Code agent name for all runners (leave blank for CLI default). Per-runner overrides can be set in the Configure step.</span>' +
+        '<input type="text" id="claudeAgent" value="' + escHtml(c.claudeAgent || '') + '" placeholder="(optional)" onchange="window._wizGitField(\'claudeAgent\', this.value)" />' +
+      '</div>' +
+      '<h3 style="margin-top:24px;margin-bottom:8px;">Dependency Detection</h3>' +
+      '<p style="color:var(--text-muted);margin-bottom:16px;">When enabled, the code and architect runners will skip cards with unresolved blocking dependencies (issue links, parent tickets, depends-on labels).</p>' +
+      '<div class="form-group">' +
+        '<label><input type="checkbox" id="depsEnabled" ' + (c.depsEnabled ? 'checked' : '') + ' onchange="window._wizGitField(\'depsEnabled\', this.checked)" /> Enable dependency checking</label>' +
+      '</div>' +
+      '<div id="depsOptions" style="' + (c.depsEnabled ? '' : 'display:none;') + '">' +
+        '<div class="form-group">' +
+          '<label>Done Statuses</label>' +
+          '<span class="hint">Which statuses count as "done" for dependency resolution. If none selected, defaults to the merge runner\'s TO status.</span>' +
+          (function() {
+            var selectedIds = (c.depsDoneStatuses || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            var cbHtml = '';
+            for (var si = 0; si < state.discoveredStatuses.length; si++) {
+              var s = state.discoveredStatuses[si];
+              var checked = selectedIds.indexOf(s.id) !== -1 ? ' checked' : '';
+              cbHtml += '<label style="display:block;margin:4px 0;font-size:13px;cursor:pointer">' +
+                '<input type="checkbox"' + checked + ' onchange="window._wizToggleDoneStatus(\'' + escHtml(s.id) + '\', this.checked)" /> ' +
+                escHtml(s.name) + '</label>';
+            }
+            return cbHtml || '<span style="color:var(--text-muted);font-size:13px">Run board discovery first to see statuses</span>';
+          })() +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label for="depsCommentMode">Comment Mode</label>' +
+          '<span class="hint">When to post "blocked by" comments on cards: first (only once), always, or never.</span>' +
+          '<select id="depsCommentMode" onchange="window._wizGitField(\'depsCommentMode\', this.value)">' +
+            '<option value="first"' + (c.depsCommentMode === 'first' || !c.depsCommentMode ? ' selected' : '') + '>First time only</option>' +
+            '<option value="always"' + (c.depsCommentMode === 'always' ? ' selected' : '') + '>Every check</option>' +
+            '<option value="never"' + (c.depsCommentMode === 'never' ? ' selected' : '') + '>Never</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label><input type="checkbox" id="depsCheckParents" ' + (c.depsCheckParents ? 'checked' : '') + ' onchange="window._wizGitField(\'depsCheckParents\', this.checked)" /> Also check parent tickets</label>' +
+        '</div>' +
+      '</div>' +
       '<div class="btn-row">' +
         backBtn() +
         '<div class="btn-row-right">' +
@@ -1392,6 +1537,20 @@ select option:disabled {
 
   window._wizGitField = function(field, val) {
     state.config[field] = val;
+    if (field === 'depsEnabled') {
+      var el = document.getElementById('depsOptions');
+      if (el) el.style.display = val ? '' : 'none';
+    }
+  };
+
+  window._wizToggleDoneStatus = function(statusId, checked) {
+    var current = (state.config.depsDoneStatuses || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    if (checked) {
+      if (current.indexOf(statusId) === -1) current.push(statusId);
+    } else {
+      current = current.filter(function(s) { return s !== statusId; });
+    }
+    state.config.depsDoneStatuses = current.join(',');
   };
 
   window._wizNext5 = function() {
@@ -1433,20 +1592,31 @@ select option:disabled {
         '<tr><td>Target Repository</td><td>' + (c.targetRepo ? escHtml(c.targetRepo) : '(current directory)') + '</td></tr>' +
         '<tr><td>Base Branch</td><td>' + escHtml(c.baseBranch) + '</td></tr>' +
         '<tr><td>Poll Interval</td><td>' + c.pollInterval + ' minutes</td></tr>' +
+        (c.claudeAgent ? '<tr><td>Default Claude Agent</td><td>' + escHtml(c.claudeAgent) + '</td></tr>' : '') +
+        '<tr><td>Dependency Detection</td><td>' + (c.depsEnabled ? 'Enabled' : 'Disabled') + '</td></tr>' +
+        (c.depsEnabled && c.depsDoneStatuses ? '<tr><td>Done Statuses</td><td>' + escHtml(c.depsDoneStatuses) + '</td></tr>' : '') +
+        (c.depsEnabled ? '<tr><td>Comment Mode</td><td>' + escHtml(c.depsCommentMode || 'first') + '</td></tr>' : '') +
+        (c.depsEnabled && c.depsCheckParents ? '<tr><td>Check Parents</td><td>Yes</td></tr>' : '') +
       '</table></div>';
 
-    // Recipes & routing
+    // Runners & routing
     html += '<div class="summary-section">' +
       '<h3>Runners</h3>' +
       '<table class="summary-table">';
-    for (var ri = 0; ri < (c.recipes || []).length; ri++) {
-      var rid = c.recipes[ri];
+    for (var ri = 0; ri < (c.runners || []).length; ri++) {
+      var rid = c.runners[ri];
       var route = (c.routing || {})[rid] || {};
       var fromName = statusName(route.fromId);
       var toName = route.toId ? statusName(route.toId) : "(stays)";
+      var agentInfo = route.agent ? ' &mdash; agent: ' + escHtml(route.agent) : '';
+      var rejectedInfo = '';
+      if (rid === 'review' && route.toRejectedId) {
+        rejectedInfo = ' &nbsp; rejected &rarr; ' + escHtml(statusName(route.toRejectedId));
+      }
       html += '<tr><td>' + escHtml(rid) + '</td><td>' +
         escHtml(fromName) + ' &rarr; ' + escHtml(toName) +
-        ' &nbsp; (max: ' + (route.maxCards || '?') + ')' +
+        rejectedInfo +
+        ' &nbsp; (max: ' + (route.maxCards || '?') + ')' + agentInfo +
         '</td></tr>';
     }
     html += '</table></div>';
@@ -1478,30 +1648,41 @@ select option:disabled {
         TARGET_REPO: c.targetRepo || "",
         GIT_BASE_BRANCH: c.baseBranch,
         POLL_INTERVAL: String((c.pollInterval || 60) * 60),
-        RUNNERS_ENABLED: (c.recipes || []).join(",")
+        RUNNERS_ENABLED: (c.runners || []).join(",")
       };
 
-      // Add per-recipe routing and max cards
-      var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
-      for (var i = 0; i < recipeIds.length; i++) {
-        var rid = recipeIds[i];
+      // Global Claude agent
+      env["CLAUDE_AGENT"] = c.claudeAgent || "";
+
+      // Dependency detection
+
+      // Add per-runner routing, max cards, and agent
+      var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+      for (var i = 0; i < runnerIds.length; i++) {
+        var rid = runnerIds[i];
         var upper = rid.toUpperCase();
         var route = c.routing[rid] || {};
         env["RUNNER_" + upper + "_FROM"] = route.fromId || "";
         env["RUNNER_" + upper + "_TO"] = route.toId || "";
+        if (rid === "review" && route.toRejectedId) {
+          env["RUNNER_REVIEW_TO_REJECTED"] = route.toRejectedId;
+        }
         env["MAX_CARDS_" + upper] = String(route.maxCards || 5);
+        env["RUNNER_" + upper + "_AGENT"] = route.agent || "";
       }
 
-      // Build adapter config
+      // Build adapter config (sanitize IDs for bash-safe variable names)
       var adapterConfig = {};
       for (var s = 0; s < state.discoveredStatuses.length; s++) {
         var status = state.discoveredStatuses[s];
-        adapterConfig["STATUS_" + status.id] = status.name;
+        var safeId = status.id.replace(/[^a-zA-Z0-9_]/g, '_');
+        adapterConfig["STATUS_" + safeId] = status.name;
       }
       for (var t = 0; t < state.discoveredTransitions.length; t++) {
         var trans = state.discoveredTransitions[t];
         if (trans.toId && trans.id) {
-          adapterConfig["TRANSITION_TO_" + trans.toId] = trans.id;
+          var safeTo = trans.toId.replace(/[^a-zA-Z0-9_]/g, '_');
+          adapterConfig["TRANSITION_TO_" + safeTo] = trans.id;
         }
       }
 
@@ -1523,37 +1704,50 @@ select option:disabled {
 
   // ---- Step 7: Runner Dashboard ----
 
+  function _timeAgo(isoStr) {
+    if (!isoStr) return "";
+    var then = new Date(isoStr).getTime();
+    var now = Date.now();
+    var diff = Math.floor((now - then) / 1000);
+    if (diff < 0) return "just now";
+    if (diff < 60) return diff + "s ago";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+
   function renderRunning() {
     var r = state.runner;
     var dotCls = r.running ? "dot-green" : "dot-red";
     var statusLabel = r.running ? "Runner is active" : "Runner is stopped";
     var pidText = r.pid ? "PID: " + r.pid : "No process running";
 
-    var html = '<h2>Runner Dashboard</h2>' +
-      '<p>Control the Sorta.Fit automation runner.</p>' +
-      '<div class="dashboard-status">' +
-        '<span class="dot ' + dotCls + '"></span>' +
-        '<div>' +
-          '<div class="status-text">' + escHtml(statusLabel) + '</div>' +
-          '<div class="dashboard-detail">' + escHtml(pidText) + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="dashboard-controls">';
+    var html = '<h2>Runner</h2>' +
+      '<p>Control the Sorta.Fit automation runner.</p>';
 
+    // Status bar
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:16px">' +
+        '<span class="dot ' + dotCls + (r.running ? ' dot-pulse' : '') + '"></span>' +
+        '<div>' +
+          '<div style="font-weight:600">' + escHtml(statusLabel) + '</div>' +
+          '<div style="font-size:13px;color:var(--text-muted)">' + escHtml(pidText) + '</div>' +
+        '</div>' +
+      '</div>';
+
+    // Controls
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
     if (!r.running) {
       html += '<button class="btn btn-success" onclick="window._wizStartRunner(false)">Start Runner</button>' +
         '<button class="btn btn-secondary" onclick="window._wizStartRunner(true)" title="Run without a visible window">Start in Background</button>';
     } else {
       html += '<button class="btn btn-danger" onclick="window._wizStopRunner()">Stop Runner</button>';
     }
-
-    html += '<button class="btn btn-secondary" onclick="window._wizCheckStatus()">Refresh Status</button>' +
+    html += '<button class="btn btn-secondary" onclick="window._wizCheckStatus()">Refresh</button>' +
       '<button class="btn btn-secondary" onclick="window._wizViewLogs()">View Logs</button>' +
       '</div>' +
       '<div id="runnerMsg" class="msg"></div>';
 
     // Claude permissions check
-    var hasClaudeSettings = false;
     html += '<div style="margin-top:24px">' +
       '<h3 style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:12px">Claude Code Permissions</h3>' +
       '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">' +
@@ -1648,9 +1842,9 @@ select option:disabled {
 
   window._wizCheckStatus = async function() {
     try {
-      var data = await apiPost("/api/runner-status");
       state.runner.running = !!data.running;
       state.runner.pid = data.pid || null;
+      // status loaded
       renderCard();
     } catch(e) {
       showMsg("runnerMsg", "error", "Failed to fetch status: " + e.message);
@@ -1695,9 +1889,9 @@ select option:disabled {
     stopStatusPolling();
     state.runner.pollTimer = setInterval(async function() {
       try {
-        var data = await apiPost("/api/runner-status");
         state.runner.running = !!data.running;
         state.runner.pid = data.pid || null;
+        // status loaded
         if (state.currentStep === 7) {
           renderCard();
         }
@@ -1721,8 +1915,8 @@ select option:disabled {
     renderWelcome,
     renderDeps,
     renderBoard,
-    renderSelectRecipes,
-    renderConfigureRecipes,
+    renderSelectRunners,
+    renderConfigureRunners,
     renderGit,
     renderReview,
     renderRunning
@@ -1780,20 +1974,29 @@ select option:disabled {
         state.config.pollInterval = env.POLL_INTERVAL ? Math.round(parseInt(env.POLL_INTERVAL) / 60) : 60;
 
         if (env.RUNNERS_ENABLED) {
-          state.config.recipes = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
+          state.config.runners = env.RUNNERS_ENABLED.split(",").map(function(s) { return s.trim(); });
         }
 
-        var recipeIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
-        for (var i = 0; i < recipeIds.length; i++) {
-          var rid = recipeIds[i];
+        state.config.claudeAgent = env.CLAUDE_AGENT || "";
+
+        // Dependency detection
+
+        var runnerIds = ["refine", "architect", "code", "review", "triage", "bounce", "merge", "documenter"];
+        for (var i = 0; i < runnerIds.length; i++) {
+          var rid = runnerIds[i];
           var upper = rid.toUpperCase();
           var fromKey = "RUNNER_" + upper + "_FROM";
           var toKey = "RUNNER_" + upper + "_TO";
           var maxKey = "MAX_CARDS_" + upper;
-          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5 };
+          var agentKey = "RUNNER_" + upper + "_AGENT";
+          if (!state.config.routing[rid]) state.config.routing[rid] = { fromId: "", toId: "", maxCards: 5, agent: "" };
           if (env[fromKey]) state.config.routing[rid].fromId = env[fromKey];
           if (env[toKey]) state.config.routing[rid].toId = env[toKey];
+          if (rid === "review" && env["RUNNER_REVIEW_TO_REJECTED"]) {
+            state.config.routing[rid].toRejectedId = env["RUNNER_REVIEW_TO_REJECTED"];
+          }
           if (env[maxKey]) state.config.routing[rid].maxCards = parseInt(env[maxKey]) || state.config.routing[rid].maxCards;
+          if (env[agentKey]) state.config.routing[rid].agent = env[agentKey];
         }
 
         if (data.statuses && data.statuses.length > 0) {

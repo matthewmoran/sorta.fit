@@ -8,25 +8,18 @@ echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if ! command -v node &>/dev/null; then
-  echo "ERROR: Node.js is not installed."
-  echo "Download from https://nodejs.org"
+if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
+  echo "ERROR: Python 3 is not installed."
+  echo "Download from https://python.org"
   exit 1
 fi
 
-if ! command -v git &>/dev/null; then
-  echo "ERROR: Git is not installed."
-  echo "Download from https://git-scm.com/downloads"
-  exit 1
-fi
-
-if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
-  echo "ERROR: .env not found. Run the setup wizard first:"
-  echo "  bash setup.sh"
-  exit 1
+PYTHON_CMD="python3"
+if ! command -v python3 &>/dev/null; then
+  PYTHON_CMD="python"
 fi
 
 echo "Starting runner..."
 echo ""
 
-exec bash "$SCRIPT_DIR/core/loop.sh"
+exec "$PYTHON_CMD" "$SCRIPT_DIR/run.py" "$@"

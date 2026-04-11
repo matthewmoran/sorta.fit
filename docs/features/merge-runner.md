@@ -52,6 +52,17 @@ For each card in the source lane, the runner:
 6. **On success**: adds a board comment with the merge timestamp, PR URL, and merge method, then transitions the card
 7. **On failure**: adds an error comment to the card and does not transition
 
+### Dependency Chain Retargeting
+
+
+1. Retrieves the merged PR's head branch name
+2. Searches for open PRs targeting that branch
+3. Retargets each child PR to `GIT_BASE_BRANCH` via `gh pr edit --base`
+4. Posts a board comment on the child card noting the retarget
+5. Logs a `dep_chain_retargeted` event
+
+Retarget failures are non-fatal — they are logged as warnings but do not prevent the parent card from completing.
+
 ### Promotion PRs
 
 When `GIT_RELEASE_BRANCH` is set and differs from `GIT_BASE_BRANCH`, the runner checks for an existing open PR from `GIT_BASE_BRANCH` to `GIT_RELEASE_BRANCH` after each successful feature merge. If none exists, it creates one automatically. This supports workflows where merged features accumulate on a development branch before being promoted to a release branch.

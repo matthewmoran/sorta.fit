@@ -1,24 +1,17 @@
 @echo off
-setlocal
+echo ================================================
+echo   Sorta.Fit Runner
+echo ================================================
+echo.
 
-:: Find Git Bash
-set "GITBASH=%ProgramFiles%\Git\git-bash.exe"
-if not exist "%GITBASH%" set "GITBASH=%ProgramFiles(x86)%\Git\git-bash.exe"
-if not exist "%GITBASH%" (
-    echo ERROR: Git Bash not found. Install Git for Windows:
-    echo   https://git-scm.com/downloads
-    echo.
-    pause
+where python >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python is not installed.
+    echo Download from https://python.org
     exit /b 1
 )
 
-if not exist ".env" (
-    echo ERROR: .env not found. Run the setup wizard first:
-    echo   setup.bat
-    echo.
-    pause
-    exit /b 1
-)
+echo Starting runner...
+echo.
 
-:: Launch in Git Bash
-"%GITBASH%" --cd="%CD%" -c "bash core/loop.sh; exec bash"
+python "%~dp0run.py" %*

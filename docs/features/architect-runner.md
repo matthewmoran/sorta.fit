@@ -119,6 +119,8 @@ The architect runner appends its output below the existing refined description, 
 - Follow the repository pattern already in src/db/
 ```
 
+
+
 ### Skipping Transition
 
 If `RUNNER_ARCHITECT_TO` is left empty, the runner updates the card description and posts a comment but does not move the card to a new lane. This is useful if you want to architect cards in place without changing their board status.

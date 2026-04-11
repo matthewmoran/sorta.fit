@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# GitHub Issues adapter configuration — label-based status mappings
+# Run the setup wizard or use board_discover to find these values
+# Copy this to github-issues.config.sh and fill in your repo's labels
+#
+# GitHub Issues uses labels with a "status:" prefix for lane mapping.
+# Create labels like: status:todo, status:refined, status:in-progress, status:qa, status:done
+#
+# IMPORTANT: Bash variable names cannot contain colons or hyphens.
+# Config keys use underscores in place of special characters (e.g., status:todo becomes status_todo).
+# Config values use the real label names (for API calls).
+# The board_discover command outputs both forms for easy copy-paste.
+
+# Status label (sanitized key) → display name
+# Key: label name with special chars replaced by underscores
+# Value: human-readable display name
+STATUS_status_todo="To Do"
+STATUS_status_refined="Refined"
+STATUS_status_agent="Agent"
+STATUS_status_in_progress="In Progress"
+STATUS_status_qa="QA"
+STATUS_status_done="Done"
+STATUS_status_backlog="Backlog"
+
+# How to transition a card TO each status
+# Key: sanitized label name (colons/hyphens replaced with underscores)
+# Value: real label name (used in GitHub API calls)
+TRANSITION_TO_status_todo=status:todo
+TRANSITION_TO_status_refined=status:refined
+TRANSITION_TO_status_agent=status:agent
+TRANSITION_TO_status_in_progress=status:in-progress
+TRANSITION_TO_status_qa=status:qa
+TRANSITION_TO_status_done=status:done
+TRANSITION_TO_status_backlog=status:backlog

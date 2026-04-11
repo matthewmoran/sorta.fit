@@ -246,6 +246,83 @@ board_transition() {
     "$JIRA_BASE/issue/$issue_key/transitions" > /dev/null
 }
 
+# Get a card's current status (name and ID)
+# Output format: STATUS_NAME|STATUS_ID (e.g., "In Progress|10000", "Done|10037")
+# Other adapters (Linear, GitHub Issues) must implement this for label-based dep checks.
+board_get_card_status() {
+  local issue_key="$1"
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key?fields=status") || return 1
+  echo "$response" | \
+    node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const s=j.fields&&j.fields.status;if(s)console.log(s.name+'|'+s.id);});"
+}
+
+# Get a card's issue links, parent, subtasks, and dependency labels
+# Output format: one pipe-delimited line per link:
+#   TYPE|DIRECTION|LINKED_KEY|LINKED_STATUS_NAME|LINKED_STATUS_ID
+# Where:
+#   TYPE = blocks, parent, subtask, or label
+#   DIRECTION = inward (blocking this card) or outward (blocked by this card)
+#   LINKED_KEY = the linked issue key (e.g., TEST-5)
+#   LINKED_STATUS_NAME = human-readable status (e.g., "In Progress") or empty
+#   LINKED_STATUS_ID = Jira status ID (e.g., "10000") or empty
+# Other adapters (Linear, GitHub Issues) must implement this with the same output format.
+board_get_card_links() {
+  local issue_key="$1"
+  local response
+  response=$(jira_curl -H "$JIRA_AUTH_HEADER" "$JIRA_BASE/issue/$issue_key?fields=issuelinks,parent,subtasks,labels") || return 1
+  echo "$response" | \
+    node -e "
+      let d='';
+      process.stdin.on('data',c=>d+=c);
+      process.stdin.on('end',()=>{
+        const j=JSON.parse(d);
+        const f=j.fields;
+        // Issue links (blocks / is-blocked-by / depends-on)
+        if(f.issuelinks){
+          f.issuelinks.forEach(link=>{
+            const typeName=(link.type&&link.type.name)||'';
+            if(!/block|depend/i.test(typeName))return;
+            if(link.inwardIssue){
+              const k=link.inwardIssue.key;
+              const s=link.inwardIssue.fields&&link.inwardIssue.fields.status;
+              console.log('blocks|inward|'+k+'|'+(s?s.name:'')+'|'+(s?s.id:''));
+            }
+            if(link.outwardIssue){
+              const k=link.outwardIssue.key;
+              const s=link.outwardIssue.fields&&link.outwardIssue.fields.status;
+              console.log('blocks|outward|'+k+'|'+(s?s.name:'')+'|'+(s?s.id:''));
+            }
+          });
+        }
+        // Parent
+        if(f.parent){
+          const k=f.parent.key;
+          const s=f.parent.fields&&f.parent.fields.status;
+          console.log('parent|inward|'+k+'|'+(s?s.name:'')+'|'+(s?s.id:''));
+        }
+        // Subtasks
+        if(f.subtasks){
+          f.subtasks.forEach(sub=>{
+            const k=sub.key;
+            const s=sub.fields&&sub.fields.status;
+            console.log('subtask|outward|'+k+'|'+(s?s.name:'')+'|'+(s?s.id:''));
+          });
+        }
+        // Labels (depends-on:KEY or blocked)
+        if(f.labels){
+          f.labels.forEach(label=>{
+            if(/^depends-on:/i.test(label)){
+              const depKey=label.split(':')[1].trim();
+              console.log('label|inward|'+depKey+'|Unknown|');
+            }else if(/^blocked$/i.test(label)){
+              console.log('label|inward||Unknown|');
+            }
+          });
+        }
+      });"
+}
+
 board_discover() {
   local response
 
